@@ -1,0 +1,11 @@
+{
+  "css.customData": [".vscode/tailwind.css-data.json"],
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "files.associations": {
+    "**/styles/tailwind.css": "tailwindcss",
+    "**/styles/tw-tokens.css": "tailwindcss",
+    "**/styles/proxy-tailwind.css": "tailwindcss",
+    "**/styles/.tw-entries/*.css": "tailwindcss"
+  }
+}

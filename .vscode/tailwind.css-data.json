@@ -1,0 +1,33 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@source",
+      "description": "Tailwind CSS v4: include files when scanning for class names."
+    },
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4: define design tokens."
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4: register a custom utility."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4: register a custom variant."
+    },
+    {
+      "name": "@plugin",
+      "description": "Tailwind CSS v4: load a JS plugin."
+    },
+    {
+      "name": "@config",
+      "description": "Tailwind CSS v4: load a JS config file."
+    },
+    {
+      "name": "@apply",
+      "description": "Inlines Tailwind utilities into a CSS rule."
+    }
+  ]
+}

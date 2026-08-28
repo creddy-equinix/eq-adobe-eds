@@ -1,0 +1,4 @@
+/* Used only as a fallback entry; block CSS is compiled from tw-tokens + block JS. */
+@import "tailwindcss/theme.css" prefix(tw) source(none);
+@import "tailwindcss/utilities.css" prefix(tw) source(none);
+@import "./tw-tokens.css";

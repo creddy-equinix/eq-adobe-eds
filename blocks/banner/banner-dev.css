@@ -1,0 +1,30 @@
+/* EDS section shell is narrower than the Equinix takeover banner. */
+main > .section.banner-container {
+  margin: 0;
+}
+
+main > .section.banner-container > .banner-wrapper {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.banner h1,
+.banner p {
+  color: inherit;
+}
+
+.banner img {
+  max-width: none;
+}
+
+.banner a[data-component="button"]:any-link {
+  color: #131313;
+  background-color: #fff;
+  border-color: #fff;
+  text-decoration: none;
+}
+
+.banner a[data-component="button"]:any-link:hover {
+  text-decoration: none;
+}
