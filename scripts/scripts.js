@@ -10,6 +10,8 @@ import {
   loadSections,
   loadCSS,
   buildBlock,
+  readBlockConfig,
+  toCamelCase,
 } from './aem.js';
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
@@ -143,6 +145,93 @@ function decorateButtons(main) {
 }
 
 /**
+ * Tailwind variant prefixes, longest first so `max-nav` wins over `nav`.
+ */
+const TW_VARIANTS = [
+  'max-nav', 'max-2xl', 'max-xl', 'max-lg', 'max-md', 'max-sm',
+  'focus-visible', 'focus-within', 'group-hover', 'group-focus',
+  'peer-hover', 'peer-focus', 'first-of-type', 'last-of-type',
+  'only-of-type', 'motion-reduce', 'motion-safe', 'aria-expanded',
+  '2xl', 'xl', 'lg', 'md', 'sm', 'xs',
+  'header', 'logo', 'nav', 'no-js',
+  'dark', 'hover', 'focus', 'active', 'disabled', 'visited',
+  'checked', 'first', 'last', 'odd', 'even', 'print', 'rtl', 'ltr',
+];
+
+/**
+ * Restores colon variants in a class token.
+ * Authors encode colons as underscores (`tw_md_grid-cols-2`); the HTML pipeline
+ * then sanitizes both `_` and `:` to hyphens (`tw-md-grid-cols-2`).
+ * @param {string} className
+ * @returns {string}
+ */
+function toColonClass(className) {
+  if (className.includes('_')) {
+    return className.replace(/_/g, ':');
+  }
+  if (!className.startsWith('tw-') || className.includes(':')) {
+    return className;
+  }
+  let rest = className.slice(3);
+  const variants = [];
+  let matched = true;
+  while (matched) {
+    matched = false;
+    for (let i = 0; i < TW_VARIANTS.length; i += 1) {
+      const variant = TW_VARIANTS[i];
+      if (rest === variant || rest.startsWith(`${variant}-`)) {
+        variants.push(variant);
+        rest = rest.slice(variant.length);
+        if (rest.startsWith('-')) rest = rest.slice(1);
+        matched = true;
+        break;
+      }
+    }
+  }
+  return ['tw', ...variants, rest].filter(Boolean).join(':');
+}
+
+/**
+ * Applies remaining Section Metadata (Style → classes with colons restored)
+ * and rewrites pipeline-sanitized `tw-*` classes on the section.
+ * @param {Element} main The main element
+ */
+function applySectionMetadata(main) {
+  main.querySelectorAll(':scope > .section').forEach((section) => {
+    const metaBlock = section.querySelector('.section-metadata');
+    if (metaBlock) {
+      const meta = readBlockConfig(metaBlock);
+      Object.keys(meta).forEach((key) => {
+        if (key === 'style') {
+          String(meta.style)
+            .split(',')
+            .flatMap((part) => part.trim().split(/\s+/))
+            .filter((token) => token)
+            .forEach((token) => {
+              const className = toColonClass(token);
+              if (className) section.classList.add(className);
+            });
+        } else if (key === 'id') {
+          section.id = String(meta.id).trim();
+        } else {
+          section.dataset[toCamelCase(key)] = meta[key];
+        }
+      });
+      const wrapper = metaBlock.parentElement;
+      if (wrapper && wrapper !== section && wrapper.childElementCount === 1) {
+        wrapper.remove();
+      } else {
+        metaBlock.remove();
+      }
+    }
+    [...section.classList].forEach((className) => {
+      const next = toColonClass(className);
+      if (next !== className) section.classList.replace(className, next);
+    });
+  });
+}
+
+/**
  * Decorates the main element.
  * @param {Element} main The main element
  */
@@ -151,6 +240,7 @@ export function decorateMain(main) {
   decorateIcons(main);
   buildAutoBlocks(main);
   decorateSections(main);
+  applySectionMetadata(main);
   decorateBlocks(main);
   decorateButtons(main);
 }
@@ -177,8 +267,7 @@ async function loadEager(doc) {
   } catch (e) {
     // do nothing
   }
-  //loadCSS(`https://qa.equinix.com/etc.clientlibs/eqxcorp/clientlibs/clientlib-v2.lc-344f7a0821e429efd76e605c18285125-lc.min.css`);
-  loadCSS(`${window.hlx.codeBasePath}/styles/equinixsite.css`);
+  loadCSS(`https://qa.equinix.com/etc.clientlibs/eqxcorp/clientlibs/clientlib-v2.lc-344f7a0821e429efd76e605c18285125-lc.min.css`);
 }
 
 /**
