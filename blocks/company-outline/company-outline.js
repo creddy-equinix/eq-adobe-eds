@@ -1,3 +1,5 @@
+import { getMetadata } from '../../scripts/aem.js';
+
 const COMPANY_OUTLINE_MARKUP = `
                     <div class="tw:lg:h-full tw:lg:pe-16 tw:2xl:pe-22">
                         <div class="tw:lg:sticky tw:lg:top-24">
@@ -14,60 +16,27 @@ const COMPANY_OUTLINE_MARKUP = `
                                             <dt><strong class="tw:text-strong">Company size</strong></dt>
                                             <dd>$2.5B (USD)</dd>
                                         </dl>
-                                        <dl>
+                                        <dl data-meta="region">
                                             <dt><strong class="tw:text-strong">Region</strong></dt>
-                                            
-                                                <dd><a href="https://qa.equinix.com/data-centers/americas-colocation" class="tw:text-link">Americas</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/data-centers/europe-colocation" class="tw:text-link">Europe</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/data-centers/americas-colocation/brazil-colocation" class="tw:text-link">Brazil</a></dd>
-                                            
                                         </dl>
-                                        <dl>
+                                        <dl data-meta="solution">
                                             <dt><strong class="tw:text-strong">Solutions</strong></dt>
-                                            
-                                                <dd><a href="https://qa.equinix.com/product-solutions/ai" class="tw:text-link">AI</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/product-solutions/cloud" class="tw:text-link">Cloud</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/product-solutions/colocation" class="tw:text-link">Colocation</a></dd>
-                                            
                                         </dl>
-                                        <dl>
+                                        <dl data-meta="product">
                                             <dt><strong class="tw:text-strong">Products</strong></dt>
-                                            
-                                                <dd><a href="https://qa.equinix.com/product-solutions/connectivity/fabric" class="tw:text-link">Equinix Fabric</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/product-solutions/connectivity/fabric" class="tw:text-link">Fabric Cloud Router</a></dd>
-                                            
                                         </dl>
-                                        <dl>
+                                        <dl data-meta="industry">
                                             <dt><strong class="tw:text-strong">Industry</strong></dt>
-                                            
-                                                <dd>Automotive</dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/industries/network-service-providers" class="tw:text-link">Network Service Providers</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/industries/public-sector" class="tw:text-link">Public Sector</a></dd>
-                                            
                                         </dl>
-                                        <dl>
+                                        <dl data-meta="team">
                                             <dt><strong class="tw:text-strong">Teams/Role</strong></dt>
-                                            
-                                                <dd><a href="https://qa.equinix.com/teams/ai-leaders" class="tw:text-link">AI Leaders</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/teams/cloud-architects" class="tw:text-link">Cloud Architects</a></dd>
-                                            
-                                                <dd><a href="https://qa.equinix.com/teams/infrastructure-leaders" class="tw:text-link">Infrastructure Leaders</a></dd>
-                                            
                                         </dl>
                                     </div>
                                     <div data-role="aside-cta" class="tw:flex tw:flex-row tw:flex-wrap tw:gap-2 tw:items-center tw:max-w-max tw:xl:pt-4">
                                         
     
     
-
+    
     <a class="tw:button tw:cursor-pointer tw:button--primary tw:button--sm   " data-component="button" href="/contact-us/sales">
     	<span class="tw:button__label">Talk to an expert</span>
         
@@ -92,33 +61,102 @@ const COMPANY_OUTLINE_MARKUP = `
                     </div>
 `;
 
+/** Path bases used when turning metadata labels into anchors. */
+const META_LINK_BASES = {
+  region: '/data-centers',
+  solution: '/product-solutions',
+  product: '/product-solutions',
+  industry: '/industries',
+  team: '/teams',
+};
+
+/** Page metadata fields rendered into the company outline. */
+const META_FIELDS = Object.keys(META_LINK_BASES);
+
+/**
+ * Splits a comma-separated metadata value into trimmed labels.
+ * @param {string} value
+ * @returns {string[]}
+ */
+function splitMetaValues(value) {
+  return String(value || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Converts a label into a URL path segment.
+ * @param {string} label
+ * @returns {string}
+ */
+function toSlug(label) {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Fills a definition list with linked <dd> labels from page metadata.
+ * Hides the list when metadata is missing.
+ * @param {Element} root
+ * @param {string} metaName metadata name attribute, e.g. 'region'
+ */
+function populateMetaList(root, metaName) {
+  const list = root.querySelector(`dl[data-meta="${metaName}"]`);
+  if (!list) return;
+
+  const labels = splitMetaValues(getMetadata(metaName));
+  if (labels.length === 0) {
+    list.hidden = true;
+    return;
+  }
+
+  const base = META_LINK_BASES[metaName] || '';
+  labels.forEach((label) => {
+    const dd = document.createElement('dd');
+    const slug = toSlug(label);
+    if (base && slug) {
+      const link = document.createElement('a');
+      link.href = `${base}/${slug}`;
+      link.className = 'tw:text-link';
+      link.textContent = label;
+      dd.append(link);
+    } else {
+      dd.textContent = label;
+    }
+    list.append(dd);
+  });
+}
+
 /**
  * loads and decorates the COMPANY_OUTLINE
  * @param {Element} block The COMPANY_OUTLINE block element
  */
 export default async function decorate(block) {
-// 1. Create the wrapper container for your static HTML
-const staticContainer = document.createElement('aside');
-staticContainer.className = 'tw:relative tw:order-last tw:pt-12 tw:lg:pt-0 tw:lg:order-first tw:lg:col-span-4 tw:2xl:col-span-3'
+  const staticContainer = document.createElement('aside');
+  staticContainer.className = 'tw:relative tw:order-last tw:pt-12 tw:lg:pt-0 tw:lg:order-first tw:lg:col-span-4 tw:2xl:col-span-3';
 
-// 2. Define your static HTML structure
-staticContainer.innerHTML = COMPANY_OUTLINE_MARKUP;
+  staticContainer.innerHTML = COMPANY_OUTLINE_MARKUP;
 
-// 4. Append your new static HTML structure to the block
-block.replaceChildren(staticContainer);
+  // Labels come from page metadata, e.g.:
+  // <meta name="region" content="Asia Pacific, Americas">
+  // <meta name="solution" content="Colocation, AI">
+  // <meta name="product" content="Equinix Fabric, Fabric Cloud Router">
+  // <meta name="industry" content="Automotive, Public Sector">
+  // <meta name="team" content="AI Leaders, Cloud Architects">
+  META_FIELDS.forEach((metaName) => populateMetaList(staticContainer, metaName));
 
-const wrapper = block.parentElement;
-const section = wrapper?.parentElement;
+  block.replaceChildren(staticContainer);
 
-if (section && wrapper) {
-  // 2. Move all inner children of the block out to the section level
-  // Place them right before the original wrapper div
-  while (block.firstChild) {
-    section.insertBefore(block.firstChild, wrapper);
+  const wrapper = block.parentElement;
+  const section = wrapper?.parentElement;
+
+  if (section && wrapper) {
+    while (block.firstChild) {
+      section.insertBefore(block.firstChild, wrapper);
+    }
+    wrapper.remove();
   }
-  
-  // 3. Completely remove the original wrapper and block from the DOM
-  wrapper.remove();
-}
-
 }
