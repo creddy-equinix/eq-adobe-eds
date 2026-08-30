@@ -267,7 +267,8 @@ async function loadEager(doc) {
   } catch (e) {
     // do nothing
   }
-  loadCSS(`https://qa.equinix.com/etc.clientlibs/eqxcorp/clientlibs/clientlib-v2.lc-344f7a0821e429efd76e605c18285125-lc.min.css`);
+    //loadCSS(`https://qa.equinix.com/etc.clientlibs/eqxcorp/clientlibs/clientlib-v2.lc-344f7a0821e429efd76e605c18285125-lc.min.css`);
+    loadCSS(`${window.hlx.codeBasePath}/styles/equinixsite.css`);
 }
 
 /**
