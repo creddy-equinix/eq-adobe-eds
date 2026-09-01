@@ -245,6 +245,7 @@
   .fragments-container .tree-item.selected > .tree-item-content {
     background: var(--color-background-hover);
     border-radius: var(--border-radius-sm);
+    outline: 2px solid var(--color-primary);
   }
 
   .fragments-container .tree-item.was-selected > .tree-item-content:hover {

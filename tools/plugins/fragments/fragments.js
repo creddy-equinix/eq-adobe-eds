@@ -32,9 +32,31 @@ function toSitePath(filePath, basePath) {
   return filePath.replace(basePath, '').replace(/\.html$/, '');
 }
 
+function toSourceUrl(filePath) {
+  const withExt = /\.html$/i.test(filePath) ? filePath : `${filePath}.html`;
+  return `${DA_ORIGIN}/source${withExt}`;
+}
+
+function wrapPreviewHtml(html) {
+  if (/<html[\s>]/i.test(html) || /<body[\s>]/i.test(html)) return html;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+}
+
 function previewOrigin(context) {
   const ref = context.ref || 'main';
   return `https://${ref}--${context.repo}--${context.org}.aem.page`;
+}
+
+const sdk = { actions: null, context: null };
+
+function markLeavesAsFiles(node) {
+  const names = Object.keys(node.children || {});
+  if (!names.length) {
+    node.isFile = true;
+    return;
+  }
+  node.isFile = false;
+  names.forEach((name) => markLeavesAsFiles(node.children[name]));
 }
 
 /**
@@ -74,21 +96,27 @@ function showMessage(text, isError = false, autoHide = false) {
 function createFileTree(files, basePath) {
   const tree = {};
   files.forEach((file) => {
-    // Remove the org/repo prefix from display path
-    const displayPath = file.path.replace(basePath, '');
+    let displayPath = file.path.replace(basePath, '');
+    if (displayPath.startsWith(FRAGMENTS_BASE)) {
+      displayPath = displayPath.slice(FRAGMENTS_BASE.length);
+    }
     const parts = displayPath.split('/').filter(Boolean);
     let current = tree;
     parts.forEach((part, i) => {
+      const isLast = i === parts.length - 1;
       if (!current[part]) {
         current[part] = {
-          isFile: i === parts.length - 1 && isHtmlFile(file),
+          isFile: isLast,
           children: {},
-          path: file.path, // Keep original path for link creation
+          path: file.path,
         };
+      } else if (isLast) {
+        current[part].path = file.path;
       }
       current = current[part].children;
     });
   });
+  Object.values(tree).forEach(markLeavesAsFiles);
   return tree;
 }
 
@@ -100,19 +128,12 @@ function createFileTree(files, basePath) {
  * @param {Object} context - SDK context object
  * @param {HTMLElement} fragmentElement - The tree item element that was selected
  */
-function showPreview(fragmentPath, fragmentName, context, fragmentElement) {
+async function showPreview(fragmentPath, fragmentName, fragmentElement) {
   const iframe = document.querySelector('.preview-iframe');
   const placeholder = document.querySelector('.preview-placeholder');
   const insertBtn = document.querySelector('.insert-btn');
 
-  if (!iframe || !placeholder || !insertBtn) return;
-
-  const basePath = `/${context.org}/${context.repo}`;
-  const displayPath = toSitePath(fragmentPath, basePath);
-  const previewUrl = `${previewOrigin(context)}${displayPath}`;
-
-  // Update selection state
-  if (selectedFragment && selectedFragment.element) {
+  if (selectedFragment?.element) {
     selectedFragment.element.classList.remove('selected');
     selectedFragment.element.classList.add('was-selected');
   }
@@ -128,14 +149,31 @@ function showPreview(fragmentPath, fragmentName, context, fragmentElement) {
     fragmentElement.classList.add('selected');
   }
 
-  // Enable insert button
-  insertBtn.disabled = false;
-  insertBtn.setAttribute('aria-label', `Insert fragment "${fragmentName}"`);
+  if (insertBtn) {
+    insertBtn.disabled = false;
+    insertBtn.setAttribute('aria-label', `Insert fragment "${fragmentName}"`);
+  }
 
-  // Show iframe, hide placeholder
-  iframe.src = previewUrl;
+  if (placeholder) placeholder.classList.add('hidden');
+  if (!iframe) {
+    showMessage(`Selected "${fragmentName}". Click Insert to add it.`, false, true);
+    return;
+  }
+
   iframe.classList.remove('hidden');
-  placeholder.classList.add('hidden');
+
+  try {
+    const resp = await sdk.actions.daFetch(toSourceUrl(fragmentPath));
+    if (!resp.ok) throw new Error(`Preview failed (${resp.status})`);
+    iframe.removeAttribute('src');
+    iframe.srcdoc = wrapPreviewHtml(await resp.text());
+  } catch (error) {
+    const { context } = sdk;
+    const displayPath = toSitePath(fragmentPath, `/${context.org}/${context.repo}`);
+    iframe.srcdoc = '';
+    iframe.removeAttribute('srcdoc');
+    iframe.src = `${previewOrigin(context)}${displayPath}`;
+  }
 }
 
 /**
@@ -145,24 +183,28 @@ function showPreview(fragmentPath, fragmentName, context, fragmentElement) {
  * @param {Object} context - SDK context for preview URL generation
  * @returns {HTMLElement} Tree item element
  */
-function createTreeItem(name, node, context) {
+function createTreeItem(name, node) {
   const item = document.createElement('div');
   item.className = 'tree-item';
   item.setAttribute('role', 'listitem');
 
   const content = document.createElement('div');
   content.className = 'tree-item-content';
+  const isFile = node.isFile || !Object.keys(node.children || {}).length;
 
-  if (node.isFile) {
+  if (isFile) {
     const button = document.createElement('button');
+    button.type = 'button';
     button.className = 'fragment-btn-item';
-    button.setAttribute('role', 'button');
-    const displayName = name.replace('.html', '');
+    const displayName = name.replace(/\.html$/i, '');
+    button.dataset.path = node.path;
+    button.dataset.name = displayName;
     button.setAttribute('aria-label', `Preview fragment "${displayName}"`);
+    button.title = `Click to preview "${displayName}"`;
 
     const fragmentIcon = document.createElement('img');
     fragmentIcon.src = '/.da/icons/fragment-icon.png';
-    fragmentIcon.alt = 'Fragment';
+    fragmentIcon.alt = '';
     fragmentIcon.className = 'tree-icon';
     fragmentIcon.setAttribute('aria-hidden', 'true');
 
@@ -171,18 +213,17 @@ function createTreeItem(name, node, context) {
 
     button.appendChild(fragmentIcon);
     button.appendChild(textSpan);
-    button.title = `Click to preview "${displayName}"`;
-
-    // Click shows preview
-    button.addEventListener('click', () => {
-      showPreview(node.path, displayName, context, item);
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showPreview(node.path, displayName, item);
     });
 
     content.appendChild(button);
   } else {
     const folderButton = document.createElement('button');
+    folderButton.type = 'button';
     folderButton.className = 'folder-btn';
-    folderButton.setAttribute('role', 'button');
     folderButton.setAttribute('aria-expanded', 'false');
     folderButton.setAttribute('aria-label', `Folder ${name}`);
 
@@ -211,7 +252,11 @@ function createTreeItem(name, node, context) {
       }
     };
 
-    folderButton.addEventListener('click', toggleFolder);
+    folderButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleFolder();
+    });
     content.appendChild(folderButton);
 
     if (Object.keys(node.children).length > 0) {
@@ -222,7 +267,7 @@ function createTreeItem(name, node, context) {
       Object.entries(node.children)
         .sort(([a], [b]) => a.localeCompare(b))
         .forEach(([childName, childNode]) => {
-          list.appendChild(createTreeItem(childName, childNode, context));
+          list.appendChild(createTreeItem(childName, childNode));
         });
 
       item.appendChild(content);
@@ -394,6 +439,8 @@ function expandToDepth(item, currentDepth, targetDepth) {
 (async function init() {
   try {
     const { actions, context } = await DA_SDK;
+    sdk.actions = actions;
+    sdk.context = context;
     const fragmentsList = document.querySelector('.fragments-list');
     const searchInput = document.querySelector('.fragment-search');
     const insertBtn = document.querySelector('.insert-btn');
@@ -479,7 +526,7 @@ function expandToDepth(item, currentDepth, targetDepth) {
         Object.entries(tree)
           .sort(([a], [b]) => a.localeCompare(b))
           .forEach(([name, node]) => {
-            const item = createTreeItem(name, node, loadContext);
+            const item = createTreeItem(name, node);
             fragmentsContainer.appendChild(item);
             expandToDepth(item, 1, targetDepth);
           });
