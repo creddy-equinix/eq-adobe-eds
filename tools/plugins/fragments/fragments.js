@@ -1,6 +1,9 @@
-// Import SDK for Document Authoring
+// eslint-disable-next-line import/no-unresolved
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
+// eslint-disable-next-line import/no-unresolved
 import { crawl } from 'https://da.live/nx/public/utils/tree.js';
+// eslint-disable-next-line import/no-unresolved
+import { DA_ORIGIN } from 'https://da.live/nx/public/utils/constants.js';
 
 // Base path for fragments
 const FRAGMENTS_BASE = '/fragments';
@@ -18,6 +21,21 @@ const CONSTANTS = {
 
 // Track currently selected fragment
 let selectedFragment = null;
+
+function isHtmlFile(file) {
+  if (!file) return false;
+  if (file.ext && String(file.ext).toLowerCase() === 'html') return true;
+  return Boolean(file.path?.endsWith('.html'));
+}
+
+function toSitePath(filePath, basePath) {
+  return filePath.replace(basePath, '').replace(/\.html$/, '');
+}
+
+function previewOrigin(context) {
+  const ref = context.ref || 'main';
+  return `https://${ref}--${context.repo}--${context.org}.aem.page`;
+}
 
 /**
  * Shows a user-facing message in the feedback area
@@ -63,7 +81,7 @@ function createFileTree(files, basePath) {
     parts.forEach((part, i) => {
       if (!current[part]) {
         current[part] = {
-          isFile: i === parts.length - 1 && file.path.endsWith('.html'),
+          isFile: i === parts.length - 1 && isHtmlFile(file),
           children: {},
           path: file.path, // Keep original path for link creation
         };
@@ -89,10 +107,9 @@ function showPreview(fragmentPath, fragmentName, context, fragmentElement) {
 
   if (!iframe || !placeholder || !insertBtn) return;
 
-  // Build preview URL
   const basePath = `/${context.org}/${context.repo}`;
-  const displayPath = fragmentPath.replace(basePath, '').replace(/\.html$/, '');
-  const previewUrl = `https://main--${context.repo}--${context.org}.aem.page${displayPath}`;
+  const displayPath = toSitePath(fragmentPath, basePath);
+  const previewUrl = `${previewOrigin(context)}${displayPath}`;
 
   // Update selection state
   if (selectedFragment && selectedFragment.element) {
@@ -238,9 +255,9 @@ function handleFragmentInsert(actions, context) {
 
   try {
     const basePath = `/${context.org}/${context.repo}`;
-    const displayPath = selectedFragment.path.replace(basePath, '').replace(/\.html$/, '');
-    const fragmentUrl = `https://main--${context.repo}--${context.org}.aem.page${displayPath}`;
-    actions.sendHTML(`<a href="${fragmentUrl}" class="fragment">${fragmentUrl}</a>`);
+    const displayPath = toSitePath(selectedFragment.path, basePath);
+    // Site-relative path so scripts.js auto-blocking and loadFragment() can resolve it.
+    actions.sendHTML(`<a href="${displayPath}">${displayPath}</a>`);
     showMessage('Fragment inserted successfully', false, true);
     actions.closeLibrary();
   } catch (error) {
@@ -381,110 +398,111 @@ function expandToDepth(item, currentDepth, targetDepth) {
     const searchInput = document.querySelector('.fragment-search');
     const insertBtn = document.querySelector('.insert-btn');
 
-  // Add search handler
-  searchInput.addEventListener('input', (e) => {
-    filterFragments(e.target.value, fragmentsList);
-  });
-
-  // Add Insert button handler
-  insertBtn.addEventListener('click', () => {
-    handleFragmentInsert(actions, context);
-  });
-
-  // Add keyboard navigation for fragments list
-  fragmentsList.addEventListener('keydown', (e) => {
-    const allFragments = Array.from(fragmentsList.querySelectorAll('.fragment-btn-item'));
-    if (allFragments.length === 0) return;
-
-    const currentIndex = allFragments.findIndex((btn) => btn === document.activeElement);
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const nextIndex = (currentIndex + 1) % allFragments.length;
-      allFragments[nextIndex].focus();
-      allFragments[nextIndex].click(); // Trigger preview
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prevIndex = currentIndex <= 0 ? allFragments.length - 1 : currentIndex - 1;
-      allFragments[prevIndex].focus();
-      allFragments[prevIndex].click(); // Trigger preview
-    } else if (e.key === 'Enter' && currentIndex >= 0) {
-      e.preventDefault();
-      // Insert button click
-      insertBtn.click();
-    }
-  });
-
-  // Function to load fragments
-  async function loadFragments() {
-    const fragmentsContainer = document.querySelector('.fragments-list');
-
-    if (!fragmentsContainer.querySelector('.loading-state')) {
-      fragmentsContainer.innerHTML = '<div class="loading-state">Loading fragments...</div>';
+    if (!fragmentsList || !searchInput || !insertBtn) {
+      throw new Error('Fragments plugin markup is missing required elements');
     }
 
-    try {
-      const files = [];
-      const { context: loadContext, token } = await DA_SDK;
-      const path = `/${loadContext.org}/${loadContext.repo}${FRAGMENTS_BASE}`;
-      const basePath = `/${loadContext.org}/${loadContext.repo}`;
+    searchInput.addEventListener('input', (e) => {
+      filterFragments(e.target.value, fragmentsList);
+    });
 
-      const { results } = crawl({
-        path,
-        callback: (file) => {
-          if (file.path.endsWith('.html')) {
-            files.push(file);
-          }
-        },
-        throttle: CONSTANTS.CRAWL_THROTTLE,
-        mode: 'horizontal',
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    insertBtn.addEventListener('click', () => {
+      handleFragmentInsert(actions, context);
+    });
 
-      await results;
+    fragmentsList.addEventListener('keydown', (e) => {
+      const allFragments = Array.from(fragmentsList.querySelectorAll('.fragment-btn-item'));
+      if (allFragments.length === 0) return;
 
-      // Clear loading message
-      fragmentsContainer.innerHTML = '';
+      const currentIndex = allFragments.findIndex((btn) => btn === document.activeElement);
 
-      if (files.length === 0) {
-        fragmentsContainer.innerHTML = '<div class="loading-state">No fragments found</div>';
-        return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = (currentIndex + 1) % allFragments.length;
+        allFragments[nextIndex].focus();
+        allFragments[nextIndex].click();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = currentIndex <= 0 ? allFragments.length - 1 : currentIndex - 1;
+        allFragments[prevIndex].focus();
+        allFragments[prevIndex].click();
+      } else if (e.key === 'Enter' && currentIndex >= 0) {
+        e.preventDefault();
+        insertBtn.click();
+      }
+    });
+
+    async function loadFragments() {
+      const fragmentsContainer = document.querySelector('.fragments-list');
+
+      if (!fragmentsContainer.querySelector('.loading-state')) {
+        fragmentsContainer.innerHTML = '<div class="loading-state">Loading fragments...</div>';
       }
 
-      const tree = createFileTree(files, basePath);
-      const targetDepth = getBasePathDepth();
+      try {
+        const { context: loadContext, actions: loadActions } = await DA_SDK;
+        const path = `/${loadContext.org}/${loadContext.repo}${FRAGMENTS_BASE}`;
+        const basePath = `/${loadContext.org}/${loadContext.repo}`;
 
-      Object.entries(tree)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .forEach(([name, node]) => {
-          const item = createTreeItem(name, node, loadContext);
-          fragmentsContainer.appendChild(item);
+        const probe = await loadActions.daFetch(`${DA_ORIGIN}/list${path}`);
+        if (!probe.ok) {
+          const hint = probe.status === 404
+            ? `No ${FRAGMENTS_BASE} folder found in this site.`
+            : `Could not list fragments (${probe.status}).`;
+          throw new Error(hint);
+        }
 
-          // Expand folders to the target depth
-          expandToDepth(item, 1, targetDepth);
+        const found = [];
+        const { results } = crawl({
+          path,
+          callback: (file) => {
+            if (isHtmlFile(file)) found.push(file);
+          },
+          throttle: CONSTANTS.CRAWL_THROTTLE,
         });
-    } catch (error) {
-      // Clear loading spinner and show error with retry option
-      fragmentsContainer.innerHTML = `
+
+        const crawled = await results;
+        const files = found.length
+          ? found
+          : (crawled || []).filter(isHtmlFile);
+
+        fragmentsContainer.innerHTML = '';
+
+        if (files.length === 0) {
+          fragmentsContainer.innerHTML = `<div class="loading-state">No fragments found in ${FRAGMENTS_BASE}</div>`;
+          return;
+        }
+
+        const tree = createFileTree(files, basePath);
+        const targetDepth = getBasePathDepth();
+
+        Object.entries(tree)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .forEach(([name, node]) => {
+            const item = createTreeItem(name, node, loadContext);
+            fragmentsContainer.appendChild(item);
+            expandToDepth(item, 1, targetDepth);
+          });
+      } catch (error) {
+        const detail = error?.message || 'Failed to load fragments.';
+        fragmentsContainer.innerHTML = `
         <div class="error-state">
-          <p>Failed to load fragments.</p>
+          <p></p>
           <button class="retry-btn" type="button">Retry</button>
         </div>
       `;
-      showMessage('Failed to load fragments. Click Retry to try again.', true);
+        fragmentsContainer.querySelector('.error-state p').textContent = detail;
+        showMessage(`${detail} Click Retry to try again.`, true);
 
-      // Add retry handler
-      const retryBtn = fragmentsContainer.querySelector('.retry-btn');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', loadFragments);
+        const retryBtn = fragmentsContainer.querySelector('.retry-btn');
+        if (retryBtn) {
+          retryBtn.addEventListener('click', loadFragments);
+        }
       }
     }
-  }
 
-  // Load fragments initially
-  await loadFragments();
+    await loadFragments();
   } catch (error) {
-    showMessage('Initialization failed. Please refresh the page.', true);
+    showMessage('Initialization failed. Open this plugin from the DA library, not as a standalone page.', true);
   }
 }());

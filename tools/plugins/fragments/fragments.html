@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Fragments Tool</title>
-  <link rel="stylesheet" href="fragments.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/tools/plugins/fragments/fragments.css">
+  <!-- Load the DA SDK first so it can catch the parent init message. -->
+  <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+  <script type="module" src="/tools/plugins/fragments/fragments.js"></script>
 </head>
 <body>
   <div class="fragments-container">
@@ -51,6 +56,5 @@
     </div>
   </div>
 
-  <script type="module" src="fragments.js"></script>
 </body>
 </html>
