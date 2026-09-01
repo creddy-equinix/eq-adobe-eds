@@ -255,10 +255,17 @@
   }
 
   .fragments-container .tree-icon {
+    display: inline-flex;
+    flex-shrink: 0;
     width: 15px;
     height: 15px;
     margin-right: 5px;
-    vertical-align: middle;
+    color: var(--color-text-secondary);
+  }
+
+  .fragments-container .tree-icon svg {
+    width: 15px;
+    height: 15px;
   }
 
   .fragments-container .tree-list {

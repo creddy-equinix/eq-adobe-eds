@@ -10,14 +10,27 @@ const FRAGMENTS_BASE = '/fragments';
 
 // Add constants at the top
 const CONSTANTS = {
-  AUTO_HIDE_DELAY: 1000,
   CRAWL_THROTTLE: 10,
-  ICONS: {
-    FOLDER: '/.da/icons/folder-icon.png',
-    FOLDER_OPEN: '/.da/icons/folder-open-icon.png',
-    FRAGMENT: '/.da/icons/fragment-icon.png',
-  },
 };
+
+const SVG = {
+  fragment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  folderOpen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 10h18"/></svg>',
+};
+
+function createIcon(kind, extraClass = '') {
+  const span = document.createElement('span');
+  span.className = extraClass ? `tree-icon ${extraClass}` : 'tree-icon';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = SVG[kind];
+  return span;
+}
+
+function setFolderIcon(el, open) {
+  if (!el) return;
+  el.innerHTML = open ? SVG.folderOpen : SVG.folder;
+}
 
 // Track currently selected fragment
 let selectedFragment = null;
@@ -210,16 +223,10 @@ function createTreeItem(name, node) {
     button.setAttribute('aria-label', `Preview fragment "${displayName}"`);
     button.title = `Click to preview "${displayName}"`;
 
-    const fragmentIcon = document.createElement('img');
-    fragmentIcon.src = '/.da/icons/fragment-icon.png';
-    fragmentIcon.alt = '';
-    fragmentIcon.className = 'tree-icon';
-    fragmentIcon.setAttribute('aria-hidden', 'true');
-
     const textSpan = document.createElement('span');
     textSpan.textContent = displayName;
 
-    button.appendChild(fragmentIcon);
+    button.appendChild(createIcon('fragment'));
     button.appendChild(textSpan);
     button.addEventListener('click', (event) => {
       event.preventDefault();
@@ -241,11 +248,7 @@ function createTreeItem(name, node) {
     folderButton.setAttribute('aria-expanded', 'false');
     folderButton.setAttribute('aria-label', `Folder ${name}`);
 
-    const folderIcon = document.createElement('img');
-    folderIcon.src = '/.da/icons/folder-icon.png';
-    folderIcon.alt = ''; // Decorative image, using aria-hidden instead
-    folderIcon.className = 'tree-icon folder-icon';
-    folderIcon.setAttribute('aria-hidden', 'true');
+    const folderIcon = createIcon('folder', 'folder-icon');
 
     const label = document.createElement('span');
     label.className = 'folder-name';
@@ -257,9 +260,7 @@ function createTreeItem(name, node) {
     const toggleFolder = () => {
       folderButton.classList.toggle('expanded');
       folderButton.setAttribute('aria-expanded', folderButton.classList.contains('expanded'));
-      folderIcon.src = folderButton.classList.contains('expanded')
-        ? '/.da/icons/folder-open-icon.png'
-        : '/.da/icons/folder-icon.png';
+      setFolderIcon(folderIcon, folderButton.classList.contains('expanded'));
       const list = item.querySelector('.tree-list');
       if (list) {
         list.classList.toggle('hidden');
@@ -322,12 +323,7 @@ function handleFragmentInsert(event) {
   }
 
   try {
-    // Tags in this repo inserts with sendText. Some DA dialogs ignore sendHTML.
-    // A paragraph-wrapped link is what the editor actually persists.
-    const html = `<p><a href="${href}">${href}</a></p>`;
-    if (typeof actions.sendHTML === 'function') actions.sendHTML(html);
-    if (typeof actions.sendText === 'function') actions.sendText(href);
-    showMessage(`Inserted ${href}. Close this plugin and check the document.`, false, false);
+    actions.sendHTML(`<p><a href="${href}">${href}</a></p>`);
   } catch (error) {
     showMessage(error?.message || 'Failed to insert fragment', true);
   }
@@ -369,7 +365,7 @@ function filterFragments(searchText, fragmentsList) {
       folderBtn.setAttribute('aria-expanded', 'true');
       const folderIcon = folderBtn.querySelector('.folder-icon');
       if (folderIcon) {
-        folderIcon.src = '/.da/icons/folder-open-icon.png';
+        setFolderIcon(folderIcon, true);
       }
       list.classList.remove('hidden');
     }
@@ -395,7 +391,7 @@ function filterFragments(searchText, fragmentsList) {
           folderBtn.setAttribute('aria-expanded', 'true');
           const folderIcon = folderBtn.querySelector('.folder-icon');
           if (folderIcon) {
-            folderIcon.src = '/.da/icons/folder-open-icon.png';
+            setFolderIcon(folderIcon, true);
           }
           list.classList.remove('hidden');
         } else {
@@ -404,7 +400,7 @@ function filterFragments(searchText, fragmentsList) {
           folderBtn.setAttribute('aria-expanded', 'false');
           const folderIcon = folderBtn.querySelector('.folder-icon');
           if (folderIcon) {
-            folderIcon.src = '/.da/icons/folder-icon.png';
+            setFolderIcon(folderIcon, false);
           }
           list.classList.add('hidden');
         }
@@ -444,7 +440,7 @@ function expandToDepth(item, currentDepth, targetDepth) {
     folderBtn.setAttribute('aria-expanded', 'true');
     const folderIcon = folderBtn.querySelector('.folder-icon');
     if (folderIcon) {
-      folderIcon.src = '/.da/icons/folder-open-icon.png';
+      setFolderIcon(folderIcon, true);
     }
     list.classList.remove('hidden');
 
