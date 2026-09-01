@@ -3,7 +3,7 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { crawl } from 'https://da.live/nx/public/utils/tree.js';
 
 // Base path for fragments
-const FRAGMENTS_BASE = '/';
+const FRAGMENTS_BASE = '/fragments';
 
 // Add constants at the top
 const CONSTANTS = {
