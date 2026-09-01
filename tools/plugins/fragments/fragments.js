@@ -32,6 +32,13 @@ function toSitePath(filePath, basePath) {
   return filePath.replace(basePath, '').replace(/\.html$/, '');
 }
 
+function fragmentHref(filePath) {
+  const { context } = sdk;
+  const sitePath = toSitePath(filePath, `/${context.org}/${context.repo}`);
+  const ref = !context.ref || context.ref === 'local' ? 'main' : context.ref;
+  return `https://${ref}--${context.repo}--${context.org}.aem.page${sitePath}`;
+}
+
 function toSourceUrl(filePath) {
   const withExt = /\.html$/i.test(filePath) ? filePath : `${filePath}.html`;
   return `${DA_ORIGIN}/source${withExt}`;
@@ -151,6 +158,7 @@ async function showPreview(fragmentPath, fragmentName, fragmentElement) {
 
   if (insertBtn) {
     insertBtn.disabled = false;
+    insertBtn.removeAttribute('disabled');
     insertBtn.setAttribute('aria-label', `Insert fragment "${fragmentName}"`);
   }
 
@@ -218,6 +226,12 @@ function createTreeItem(name, node) {
       event.stopPropagation();
       showPreview(node.path, displayName, item);
     });
+    button.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showPreview(node.path, displayName, item);
+      handleFragmentInsert(event);
+    });
 
     content.appendChild(button);
   } else {
@@ -283,30 +297,39 @@ function createTreeItem(name, node) {
 }
 
 /**
- * Handles fragment insertion by inserting a link for the currently selected fragment
- * @param {Object} actions - SDK actions object
- * @param {Object} context - SDK context
+ * Inserts the selected fragment link into the open DA document.
+ * DA's editor ignores a bare <a>; wrap it in a paragraph and use a full URL.
  */
-function handleFragmentInsert(actions, context) {
-  if (!selectedFragment) {
-    showMessage('No fragment selected', true);
+function handleFragmentInsert(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  const { actions } = sdk;
+  if (!selectedFragment?.path) {
+    showMessage('Select a fragment first', true);
     return;
   }
 
-  if (!actions?.sendHTML) {
+  if (!actions?.sendHTML && !actions?.sendText) {
     showMessage('Cannot insert fragment: Editor not available', true);
     return;
   }
 
+  const href = fragmentHref(selectedFragment.path);
+  if (!href.includes('/fragments/')) {
+    showMessage(`Could not build fragment URL from ${selectedFragment.path}`, true);
+    return;
+  }
+
   try {
-    const basePath = `/${context.org}/${context.repo}`;
-    const displayPath = toSitePath(selectedFragment.path, basePath);
-    // Site-relative path so scripts.js auto-blocking and loadFragment() can resolve it.
-    actions.sendHTML(`<a href="${displayPath}">${displayPath}</a>`);
-    showMessage('Fragment inserted successfully', false, true);
-    actions.closeLibrary();
+    // Tags in this repo inserts with sendText. Some DA dialogs ignore sendHTML.
+    // A paragraph-wrapped link is what the editor actually persists.
+    const html = `<p><a href="${href}">${href}</a></p>`;
+    if (typeof actions.sendHTML === 'function') actions.sendHTML(html);
+    if (typeof actions.sendText === 'function') actions.sendText(href);
+    showMessage(`Inserted ${href}. Close this plugin and check the document.`, false, false);
   } catch (error) {
-    showMessage('Failed to insert fragment', true);
+    showMessage(error?.message || 'Failed to insert fragment', true);
   }
 }
 
@@ -453,9 +476,7 @@ function expandToDepth(item, currentDepth, targetDepth) {
       filterFragments(e.target.value, fragmentsList);
     });
 
-    insertBtn.addEventListener('click', () => {
-      handleFragmentInsert(actions, context);
-    });
+    insertBtn.addEventListener('click', handleFragmentInsert);
 
     fragmentsList.addEventListener('keydown', (e) => {
       const allFragments = Array.from(fragmentsList.querySelectorAll('.fragment-btn-item'));
