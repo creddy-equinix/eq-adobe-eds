@@ -33,18 +33,9 @@ const COMPANY_OUTLINE_MARKUP = `
                                         </dl>
                                     </div>
                                     <div data-role="aside-cta" class="tw:flex tw:flex-row tw:flex-wrap tw:gap-2 tw:items-center tw:max-w-max tw:xl:pt-4">
-                                        
-    
-    
-    
     <a class="tw:button tw:cursor-pointer tw:button--primary tw:button--sm   " data-component="button" href="/contact-us/sales">
     	<span class="tw:button__label">Talk to an expert</span>
-        
-        
     </a>
-
-    
-
                                         <a id="btn-print" href="#" data-component="button" class="tw:button tw:cursor-pointer tw:button--secondary tw:button--icon-start tw:button--sm">
                                             <span class="tw:button__label">Print page</span>
                                             <span class="tw:button__icon">

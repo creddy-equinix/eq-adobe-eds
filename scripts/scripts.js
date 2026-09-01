@@ -307,3 +307,13 @@ async function loadPage() {
 }
 
 loadPage();
+
+/**
+ * Enables DA Live Preview in the document editor.
+ * Only loads when the page is opened with ?dapreview=...
+ * @see https://docs.da.live/authors/reference/live-preview
+ */
+(async function loadDa() {
+  if (!new URL(window.location.href).searchParams.get('dapreview')) return;
+  import('https://da.live/scripts/dapreview.js').then(({ default: daPreview }) => daPreview(loadPage));
+}());
