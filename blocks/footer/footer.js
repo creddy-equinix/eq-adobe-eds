@@ -4,7 +4,7 @@ const FOOTER_MARKUP = `
 <footer id="footer-primary" lang="" dir="" data-theme="dark" data-component="footer" class="tw:relative tw:overflow-hidden tw:bg-linear-to-b tw:from-neutral-800 tw:to-black tw:text-neutral-400 tw:py-10 tw:nav:bg-linear-120">
   <div class="tw:wrapper tw:relative">
     <div class="tw:absolute tw:mask-alpha tw:mask-l-from-black tw:mask-l-from-50% tw:mask-l-to-transparent tw:start-0 tw:-bottom-10 tw:z-0 tw:nav:mask-l-from-80%">
-      <img loading="lazy" src="/content/dam/eqxcorp/en_us/images/footer/footer-grid.png" alt="" role="presentation" class="tw:z-0 tw:opacity-50 tw:nav:opacity-100 tw:max-w-xl">
+      <img loading="lazy" src="https://qa.equinix.com/content/dam/eqxcorp/en_us/images/footer/footer-grid.png" alt="" role="presentation" class="tw:z-0 tw:opacity-50 tw:nav:opacity-100 tw:max-w-xl">
     </div>
     <div class="tw:flex tw:flex-col tw:gap-6 tw:relative tw:z-10 tw:nav:gap-12">
       <section class="tw:flex tw:flex-col tw:gap-5 tw:nav:grid tw:nav:gap-10 tw:xl:grid-cols-2">

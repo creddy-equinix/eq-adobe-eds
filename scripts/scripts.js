@@ -272,11 +272,30 @@ async function loadEager(doc) {
 }
 
 /**
+ * Site chrome (header/footer) is only for authored pages under DA `/dev`.
+ * Fragments, redirects, and other root/utility docs should render without it.
+ * @returns {boolean}
+ */
+function shouldLoadSiteChrome() {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  return path === '/dev' || path.startsWith('/dev/');
+}
+
+/**
  * Loads everything that doesn't need to be delayed.
  * @param {Element} doc The container element
  */
 async function loadLazy(doc) {
-  loadHeader(doc.querySelector('body > header'));
+  const header = doc.querySelector('body > header');
+  const footer = doc.querySelector('body > footer');
+  const loadChrome = shouldLoadSiteChrome();
+
+  if (loadChrome) {
+    loadHeader(header);
+  } else {
+    header?.remove();
+    footer?.remove();
+  }
 
   const main = doc.querySelector('main');
   await loadSections(main);
@@ -285,7 +304,9 @@ async function loadLazy(doc) {
   const element = hash ? doc.getElementById(hash.substring(1)) : false;
   if (hash && element) element.scrollIntoView();
 
-  loadFooter(doc.querySelector('body > footer'));
+  if (loadChrome) {
+    loadFooter(footer);
+  }
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();

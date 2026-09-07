@@ -7,7 +7,7 @@ const COMPANY_OUTLINE_MARKUP = `
                           <!-- Company outline block -->
                             <div class="tw:w-full tw:text-secondary tw:overflow-y-auto tw:scrollbar">
                                 <div class="tw:relative tw:space-y-6 tw:text-sm tw:text-pretty tw:lg:text-xs">
-                                    <img class="tw:h-auto tw:w-full tw:max-w-40 tw:dark:grayscale-100 tw:dark:saturate-0 tw:dark:brightness-0 tw:dark:invert-100" data-graphic="logo-nanyang-biologics" src="/content/dam/eqxcorp/en_us/images/customer-stories/Nanyang.svg" alt="Nanyang Logo Alt text">
+                                    <img class="tw:h-auto tw:w-full tw:max-w-40 tw:dark:grayscale-100 tw:dark:saturate-0 tw:dark:brightness-0 tw:dark:invert-100" data-graphic="logo-nanyang-biologics" src="https://qa.equinix.com/content/dam/eqxcorp/en_us/images/customer-stories/Nanyang.svg" alt="Nanyang Logo Alt text">
                                     <div data-role="aside-description" class="tw:prose-minor tw:space-y-3" aria-label="Company description">
                                         <p>Nanyang Biologics has been shaping Hong Kong's skyline and infrastructure since 1958, delivering critical infrastructure while continually tackling complex safety challenges. Building on its long-standing Zero Harm commitment, Gammon is now re-imagining its future through digital transformation and AI-driven Smart Construction 4.0.</p>
                                     </div>

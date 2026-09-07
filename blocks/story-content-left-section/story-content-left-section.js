@@ -201,7 +201,7 @@ function createStaticLogo() {
     'tw:lg:hidden',
     'tw:print:hidden',
   ].join(' '), {
-    src: '/content/dam/eqxcorp/en_us/images/customer-stories/Nanyang.svg',
+    src: 'https://qa.equinix.com/content/dam/eqxcorp/en_us/images/customer-stories/Nanyang.svg',
     alt: 'Nanyang Biologics logo',
   });
   img.dataset.graphic = 'logo-nanyang-biologics';
