@@ -272,13 +272,15 @@ async function loadEager(doc) {
 }
 
 /**
- * Site chrome (header/footer) is only for authored pages under DA `/dev`.
- * Fragments, redirects, and other root/utility docs should render without it.
+ * Site chrome (header/footer) for authored pages.
+ * After a /dev content remount, pages are served as /us/en/... (no /dev prefix).
+ * Utility docs (fragments, redirects, drafts, tools) stay chrome-free.
  * @returns {boolean}
  */
 function shouldLoadSiteChrome() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
-  return path === '/dev' || path.startsWith('/dev/');
+  const noChromePrefixes = ['/fragments', '/redirects', '/drafts', '/tools', '/widgets'];
+  return !noChromePrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
 /**
