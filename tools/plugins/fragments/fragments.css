@@ -108,6 +108,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: relative;
+    z-index: 2;
   }
 
   .fragments-container .preview-actions {
@@ -245,6 +247,7 @@
   .fragments-container .tree-item.selected > .tree-item-content {
     background: var(--color-background-hover);
     border-radius: var(--border-radius-sm);
+    outline: 2px solid var(--color-primary);
   }
 
   .fragments-container .tree-item.was-selected > .tree-item-content:hover {
@@ -252,10 +255,17 @@
   }
 
   .fragments-container .tree-icon {
+    display: inline-flex;
+    flex-shrink: 0;
     width: 15px;
     height: 15px;
     margin-right: 5px;
-    vertical-align: middle;
+    color: var(--color-text-secondary);
+  }
+
+  .fragments-container .tree-icon svg {
+    width: 15px;
+    height: 15px;
   }
 
   .fragments-container .tree-list {
