@@ -43,6 +43,19 @@ body {
   gap: var(--rollout-space-m);
 }
 
+.rollout-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--rollout-space-s);
+}
+
+.rollout-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .rollout-header h2 {
   margin: 0;
   font-size: var(--rollout-font-size-m);

@@ -4,6 +4,7 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { DA_ORIGIN } from 'https://da.live/nx/public/utils/constants.js';
 
 const TRANSLATE_PATH = '/.da/translate.json';
+const ROLLOUT_ICON = 'https://da.live/nx/public/plugins/rollout/media_195da69764de2782d555abed3042d8434a040e31c.png';
 
 function sourceUrl(org, repo, path) {
   const withExt = /\.html$/i.test(path) ? path : `${path}.html`;
@@ -230,12 +231,19 @@ function renderForm({ context, actions, details }) {
 
   const header = document.createElement('div');
   header.className = 'rollout-header';
+  const brand = document.createElement('div');
+  brand.className = 'rollout-brand';
+  const logo = document.createElement('img');
+  logo.className = 'rollout-logo';
+  logo.src = ROLLOUT_ICON;
+  logo.alt = '';
   const title = document.createElement('h2');
   title.textContent = 'Rollout';
+  brand.append(logo, title);
   const pathLine = document.createElement('p');
   pathLine.className = 'rollout-path';
   pathLine.textContent = context.path || '';
-  header.append(title, pathLine);
+  header.append(brand, pathLine);
   container.appendChild(header);
 
   const fields = document.createElement('div');

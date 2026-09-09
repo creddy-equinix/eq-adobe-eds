@@ -8,15 +8,15 @@ Adobe's public plugin (`https://da.live/nx/public/plugins/rollout.html`) fails i
 
 In `https://da.live/config#/{org}/{site}/` on the **library** tab, replace the Adobe Rollout row with:
 
-| title   | path                                  | format | ref | icon                                                                 | experience |
-| ------- | ------------------------------------- | ------ | --- | -------------------------------------------------------------------- | ---------- |
-| Rollout | `/tools/plugins/rollout/rollout.html` |        |     | `https://main--{site}--{org}.aem.live/tools/plugins/rollout/rollout.svg` | `dialog`   |
+| title   | path                                  | format | ref | icon                                                                                         | experience |
+| ------- | ------------------------------------- | ------ | --- | -------------------------------------------------------------------------------------------- | ---------- |
+| Rollout | `/tools/plugins/rollout/rollout.html` |        |     | `https://da.live/nx/public/plugins/rollout/media_195da69764de2782d555abed3042d8434a040e31c.png` | `dialog`   |
 
 For `eq-adobe-eds-dev`:
 
 | title   | path                                  | icon                                                                                         | experience |
 | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------- | ---------- |
-| Rollout | `/tools/plugins/rollout/rollout.html` | `https://main--eq-adobe-eds-dev--creddy-equinix.aem.live/tools/plugins/rollout/rollout.svg` | `dialog`   |
+| Rollout | `/tools/plugins/rollout/rollout.html` | `https://da.live/nx/public/plugins/rollout/media_195da69764de2782d555abed3042d8434a040e31c.png` | `dialog`   |
 
 Save the config. Preview/publish is not required for the HTML if the branch is already live; after a code push, hard-refresh DA and reopen Library.
 
