@@ -280,6 +280,7 @@ async function loadEager(doc) {
 function shouldLoadSiteChrome() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/';
   const noChromePrefixes = ['/fragments', '/redirects', '/drafts', '/tools', '/widgets'];
+  if (path === '/nav' || path.endsWith('/nav')) return false;
   return !noChromePrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 

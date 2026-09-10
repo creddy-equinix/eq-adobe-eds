@@ -1,6 +1,8 @@
 /* eslint-disable max-len */
 
 import decorateNavigation from './navigation-primary.js';
+import { getMetadata } from '../../scripts/aem.js';
+import { getLocalizedPath } from '../../scripts/locales.js';
 
 const HEADER_MARKUP = `
 <header id="header-primary" lang="" dir="" data-theme="" data-component="header" class="tw:bg-canvas tw:shadow-sm tw:relative tw:px-4 tw:text-sm-fixed tw:text-primary tw:top-0 tw:transition-transform tw:duration-200 tw:ease-linear tw:z-190 tw:will-change tw:header:px-0">
@@ -456,6 +458,281 @@ const HEADER_MARKUP = `
 </header>
 `;
 
+const CARET_SVG = `
+  <span data-role="caret" class="tw:w-3 tw:h-3 tw:transition-transform tw:duration-75 tw:flex">
+    <svg class="e-caret-down" role="presentation" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M11.1525 16.4493C11.6213 16.9181 12.3825 16.9181 12.8513 16.4493L20.0513 9.24934C20.52 8.78059 20.52 8.01934 20.0513 7.55059C19.5825 7.08184 18.8213 7.08184 18.3525 7.55059L12 13.9031L5.64752 7.55434C5.17877 7.08559 4.41752 7.08559 3.94877 7.55434C3.48002 8.02309 3.48002 8.78434 3.94877 9.25309L11.1488 16.4531L11.1525 16.4493Z" fill="currentColor"></path>
+    </svg>
+  </span>
+`;
+
+const ARROW_SVG = `
+  <svg class="e-arrow-right" role="presentation" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M11.7935 4.3522C11.9341 4.17638 12.2154 4.17638 12.3912 4.3522L19.7402 11.7012C19.916 11.877 19.916 12.1231 19.7402 12.2989L12.3912 19.6479C12.2154 19.8237 11.9341 19.8237 11.7935 19.6479L11.0902 18.9798C10.9144 18.804 10.9144 18.5227 11.0902 18.382L16.5404 12.8967H4.55C4.30386 12.8967 4.12805 12.7209 4.12805 12.4747V11.4902C4.12805 11.2792 4.30386 11.0682 4.55 11.0682H16.5404L11.0902 5.61805C10.9144 5.4774 10.9144 5.1961 11.0902 5.02028L11.7935 4.3522Z" fill="currentColor"></path>
+  </svg>
+`;
+
+const PROMO_CLASS = 'tw:relative tw:hidden tw:flex-col tw:items-start tw:gap-2 tw:p-4 tw:rounded-sm tw:overflow-hidden tw:bg-linear-120 tw:nav:flex tw:hover:underline tw:focus:outline-0 tw:focus-visible:outline-1 tw:focus-visible:outline-violet tw:hover:dark:text-white tw:focus:dark:text-white tw:focus-visible:dark:outline-violet-100';
+const PROMO_THEME = {
+  light: 'tw:from-aqua-100 tw:via-purple-100 tw:to-orange-100 tw:dark:from-blue-900 tw:dark:via-purple tw:dark:to-red',
+  dark: 'tw:from-blue-900 tw:via-purple tw:to-red',
+};
+
+function toKey(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^0-9a-z]+/gi, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function slugify(value) {
+  return toKey(value) || 'nav-item';
+}
+
+function cellText(cell) {
+  return cell?.textContent.replace(/\s+/g, ' ').trim() || '';
+}
+
+function cellHref(cell) {
+  return cell?.querySelector('a[href]')?.getAttribute('href') || '';
+}
+
+function cellImage(cell) {
+  const img = cell?.querySelector('img');
+  if (img) return img.getAttribute('src') || img.src || '';
+  const href = cellHref(cell) || cellText(cell);
+  return /\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(href) ? href : '';
+}
+
+function rowValue(valueCell) {
+  return cellHref(valueCell) || cellText(valueCell);
+}
+
+/**
+ * Reads one banner-style header-nav table (2-column key / value rows).
+ * @param {Element} block
+ */
+function parseHeaderNavBlock(block) {
+  const item = { label: '', link: '', l2: [], l3: [], l4: null };
+  let currentL2 = null;
+  let currentL3 = null;
+
+  const ensureL4 = () => {
+    if (!item.l4) item.l4 = { label: '', cta: '', link: '', image: '', theme: 'light' };
+    return item.l4;
+  };
+
+  [...block.children].forEach((row) => {
+    const [nameCell, valueCell] = row.children;
+    if (!valueCell) return;
+    const key = toKey(nameCell.textContent);
+    const text = cellText(valueCell);
+    const href = rowValue(valueCell);
+
+    if (key === 'label' || key === 'l1-label' || key === 'title') {
+      item.label = text;
+    } else if (key === 'link' || key === 'l1-link' || key === 'href') {
+      item.link = href;
+    } else if (key === 'l2-label' || key === '2nd-level-label') {
+      currentL2 = { label: text, link: '' };
+      item.l2.push(currentL2);
+    } else if (key === 'l2-link' || key === '2nd-level-link') {
+      if (currentL2) currentL2.link = href;
+    } else if (key === 'l3-label' || key === '3rd-level-label') {
+      currentL3 = { label: text, description: '', link: '' };
+      item.l3.push(currentL3);
+    } else if (key === 'l3-description' || key === '3rd-level-description') {
+      if (currentL3) currentL3.description = text;
+    } else if (key === 'l3-link' || key === '3rd-level-link') {
+      if (currentL3) currentL3.link = href;
+    } else if (key === 'l4-label' || key === '4th-level-label') {
+      ensureL4().label = text;
+    } else if (key === 'l4-cta' || key === 'l4-description' || key === '4th-level-cta') {
+      ensureL4().cta = text;
+    } else if (key === 'l4-link' || key === '4th-level-link') {
+      ensureL4().link = href;
+    } else if (key === 'l4-image' || key === '4th-level-image') {
+      ensureL4().image = cellImage(valueCell) || href;
+    } else if (key === 'l4-theme' || key === '4th-level-theme') {
+      ensureL4().theme = text.toLowerCase() === 'dark' ? 'dark' : 'light';
+    }
+  });
+
+  if (item.l4 && !item.l4.label && !item.l4.cta && !item.l4.link) item.l4 = null;
+  return item.label ? item : null;
+}
+
+function parseAuthoredNav(root) {
+  return [...root.querySelectorAll('.header-nav')]
+    .map(parseHeaderNavBlock)
+    .filter(Boolean);
+}
+
+async function fetchAuthoredNav() {
+  const path = getLocalizedPath('nav', getMetadata('nav'));
+  try {
+    const resp = await fetch(`${path}.plain.html`);
+    if (!resp.ok) return [];
+    const wrap = document.createElement('div');
+    wrap.innerHTML = await resp.text();
+    return parseAuthoredNav(wrap);
+  } catch {
+    return [];
+  }
+}
+
+function createLink(href, label, className, extras = {}) {
+  const a = document.createElement('a');
+  a.href = href || '#';
+  a.className = className;
+  a.setAttribute('aria-label', label);
+  if (extras.title) a.title = extras.title;
+  if (extras.role) a.setAttribute('role', extras.role);
+  if (extras.controls) a.setAttribute('aria-controls', extras.controls);
+  if (extras.children != null) a.dataset.children = String(extras.children);
+  if (href?.startsWith('http')) {
+    a.rel = 'external noreferrer noopener';
+    a.target = '_blank';
+  }
+  return a;
+}
+
+function buildL2List(items) {
+  const ul = document.createElement('ul');
+  ul.className = 'tw:no-list tw:w-full tw:nav:self-stretch tw:nav:pe-5 tw:nav:w-auto tw:nav:min-w-36 tw:nav:max-w-2xs';
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    const a = createLink(item.link, item.label, 'tw:nav-link tw:nav-nested tw:nav:px-1.5', {
+      title: item.label,
+      role: 'link',
+    });
+    const span = document.createElement('span');
+    span.textContent = item.label;
+    a.append(span);
+    li.append(a);
+    ul.append(li);
+  });
+  return ul;
+}
+
+function buildL3List(items) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tw:gap-3 tw:flex-col tw:w-full tw:pb-2 tw:flex tw:nav:w-auto tw:nav:pb-0 tw:nav:max-w-2xs';
+  if (items.length) {
+    const ul = document.createElement('ul');
+    ul.className = 'tw:no-list tw:w-full tw:nav:w-auto tw:nav:self-stretch';
+    items.forEach((item) => {
+      const li = document.createElement('li');
+      const a = createLink(item.link, item.label, 'tw:group tw:nav-link tw:nav-nested tw:nav:px-1.5', {
+        title: item.label,
+        role: 'link',
+      });
+      const label = document.createElement('span');
+      label.textContent = item.label;
+      a.append(label);
+      if (item.description) {
+        const desc = document.createElement('span');
+        desc.className = 'tw:text-secondary tw:text-xs-fixed tw:font-normal tw:group-hover:text-violet tw:group-hover:dark:text-violet-100 tw:hidden tw:nav:block';
+        desc.textContent = item.description;
+        a.append(desc);
+      }
+      li.append(a);
+      ul.append(li);
+    });
+    wrap.append(ul);
+  }
+  return wrap;
+}
+
+function buildPromo(promo) {
+  const theme = promo.theme === 'dark' ? 'dark' : 'light';
+  const title = promo.cta || promo.label;
+  const a = createLink(promo.link, title, `${PROMO_CLASS} ${PROMO_THEME[theme]}`, { title });
+  a.dataset.theme = theme;
+  a.dataset.component = 'navigation/promotion';
+
+  if (promo.image) {
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'tw:absolute tw:top-0 tw:end-0 tw:opacity-30 tw:h-full';
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.dataset.graphic = 'promotion';
+    img.className = 'tw:object-cover tw:h-full tw:w-auto';
+    img.src = promo.image;
+    img.width = 560;
+    img.height = 560;
+    imgWrap.append(img);
+    a.append(imgWrap);
+  }
+
+  if (promo.label) {
+    const heading = document.createElement('p');
+    heading.className = 'tw:text-sm-fixed tw:relative tw:heading tw:text-primary';
+    heading.textContent = promo.label;
+    a.append(heading);
+  }
+
+  if (promo.cta) {
+    const cta = document.createElement('span');
+    cta.className = 'tw:text-xs-fixed tw:text-primary tw:flex tw:flex-row tw:items-center tw:gap-0.5';
+    cta.append(document.createTextNode(promo.cta));
+    const icon = document.createElement('span');
+    icon.className = 'tw:w-3 tw:h-3';
+    icon.innerHTML = ARROW_SVG.trim();
+    cta.append(icon);
+    a.append(cta);
+  }
+
+  return a;
+}
+
+function buildL1Item(item) {
+  const section = slugify(item.label);
+  const hasChildren = item.l2.length > 0 || item.l3.length > 0 || Boolean(item.l4);
+  const li = document.createElement('li');
+  li.dataset.role = 'parent';
+  li.dataset.section = section;
+  li.className = 'tw:relative tw:max-nav:border-b tw:border-offset tw:last-of-type:border-0';
+
+  const a = createLink(item.link, item.label, 'tw:nav-link nav-primary tw:text-primary tw:aria-expanded:text-violet tw:dark:aria-expanded:text-violet-100', {
+    children: hasChildren,
+    controls: hasChildren ? `navigation-${section}` : undefined,
+  });
+  a.append(document.createTextNode(item.label));
+  if (hasChildren) {
+    const caret = document.createElement('span');
+    caret.innerHTML = CARET_SVG.trim();
+    a.append(caret.firstElementChild);
+  }
+  li.append(a);
+
+  if (hasChildren) {
+    const dropdown = document.createElement('div');
+    dropdown.id = `navigation-${section}`;
+    dropdown.dataset.role = 'navigation-children';
+    dropdown.dataset.parent = section;
+    dropdown.className = 'tw:dropdown tw:hidden tw:divide-neutral-200 tw:dark:divide-neutral-700 tw:nav:start-0 tw:nav:-translate-x-1.5 tw:rtl:nav:translate-x-1.5 tw:nav:divide-x-1 tw:divide-solid';
+    if (item.l2.length) dropdown.append(buildL2List(item.l2));
+    if (item.l3.length || item.l4) {
+      const column = buildL3List(item.l3);
+      if (item.l4) column.append(buildPromo(item.l4));
+      dropdown.append(column);
+    }
+    li.append(dropdown);
+  }
+
+  return li;
+}
+
+function applyAuthoredNav(headerRoot, items) {
+  const list = headerRoot.querySelector('#nav-primary > ul');
+  if (!list || !items.length) return false;
+  list.replaceChildren(...items.map(buildL1Item));
+  return true;
+}
+
 /**
  * loads and decorates the header
  * @param {Element} block The header block element
@@ -472,5 +749,7 @@ export default async function decorate(block) {
   });
 
   block.replaceChildren(...staticHeader.children);
+  const authored = await fetchAuthoredNav();
+  applyAuthoredNav(block, authored);
   decorateNavigation();
 }
