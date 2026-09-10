@@ -33,6 +33,121 @@ function splitLocales(locales) {
     .filter(Boolean);
 }
 
+function normalizePrefix(prefix) {
+  if (!prefix) return '';
+  const trimmed = String(prefix).trim();
+  if (!trimmed || trimmed === '/') return '';
+  return trimmed.startsWith('/') ? trimmed.replace(/\/$/, '') : `/${trimmed.replace(/\/$/, '')}`;
+}
+
+function collectLocalePrefixes(json) {
+  const languages = json?.languages?.data || [];
+  const prefixes = new Set();
+  languages.forEach((lang) => {
+    const location = normalizePrefix(lang.location);
+    if (location) prefixes.add(location);
+    splitLocales(lang.locales).forEach((locale) => {
+      const prefix = normalizePrefix(locale);
+      if (prefix) prefixes.add(prefix);
+    });
+  });
+  return [...prefixes].sort((a, b) => b.length - a.length);
+}
+
+const ASSET_PREFIXES = [
+  '/scripts',
+  '/styles',
+  '/fonts',
+  '/blocks',
+  '/icons',
+  '/tools',
+  '/.da',
+];
+
+function isExternalHref(href) {
+  if (!href) return true;
+  const value = href.trim();
+  return value.startsWith('#')
+    || value.startsWith('//')
+    || /^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
+function isAssetPath(path) {
+  if (path.includes('/media_') || path.startsWith('media_')) return true;
+  return ASSET_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
+function splitHref(href) {
+  const hashIndex = href.indexOf('#');
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : '';
+  const withoutHash = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const queryIndex = withoutHash.indexOf('?');
+  const query = queryIndex >= 0 ? withoutHash.slice(queryIndex) : '';
+  const path = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+  return { path, suffix: `${query}${hash}` };
+}
+
+/**
+ * Source /master/en/xyz → /us/en/xyz
+ * /xyz → prepend /master/en → /master/en/xyz → /us/en/xyz
+ * http(s), mailto, assets, and other locale prefixes are left alone.
+ */
+function localizePath(path, sourcePrefix, destPrefix, knownPrefixes) {
+  if (!path.startsWith('/') || path.startsWith('//') || isAssetPath(path)) return path;
+
+  const source = normalizePrefix(sourcePrefix);
+  const dest = normalizePrefix(destPrefix);
+  if (!source || !dest) return path;
+
+  if (path === dest || path.startsWith(`${dest}/`)) return path;
+  if (path === source || path.startsWith(`${source}/`)) {
+    return `${dest}${path.slice(source.length)}`;
+  }
+
+  const otherLocale = knownPrefixes.find((prefix) => prefix !== source
+    && (path === prefix || path.startsWith(`${prefix}/`)));
+  if (otherLocale) return path;
+
+  return `${dest}${path}`;
+}
+
+function localizeHref(href, sourcePrefix, destPrefix, knownPrefixes) {
+  if (isExternalHref(href)) return href;
+  const leading = href.match(/^\s*/)?.[0] || '';
+  const trailing = href.match(/\s*$/)?.[0] || '';
+  const { path, suffix } = splitHref(href.trim());
+  return `${leading}${localizePath(path, sourcePrefix, destPrefix, knownPrefixes)}${suffix}${trailing}`;
+}
+
+function isPathOnlyText(text) {
+  return /^\/[^\s]+$/.test(text.trim());
+}
+
+function serializeDaHtml(original, doc) {
+  if (/<!doctype/i.test(original) || /<html[\s>]/i.test(original)) {
+    const doctype = original.match(/^\s*<!doctype[^>]*>/i)?.[0] || '';
+    return `${doctype}${doc.documentElement.outerHTML}`;
+  }
+  if (/<body[\s>]/i.test(original)) return doc.body.outerHTML;
+  return doc.body.innerHTML;
+}
+
+function rewriteHtmlLinks(html, sourcePrefix, destPrefix, knownPrefixes) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('[href]').forEach((el) => {
+    el.setAttribute('href', localizeHref(el.getAttribute('href'), sourcePrefix, destPrefix, knownPrefixes));
+  });
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const texts = [];
+  while (walker.nextNode()) texts.push(walker.currentNode);
+  texts.forEach((node) => {
+    if (!isPathOnlyText(node.textContent)) return;
+    if (node.parentElement?.closest('a[href]')) return;
+    node.textContent = localizeHref(node.textContent, sourcePrefix, destPrefix, knownPrefixes);
+  });
+  return serializeDaHtml(html, doc);
+}
+
 function formatPrefixes(org, repo, currPrefix, locales, pagePath) {
   return splitLocales(locales).map((destPrefix) => ({
     active: true,
@@ -48,6 +163,7 @@ function formatPrefixes(org, repo, currPrefix, locales, pagePath) {
 function getPrefixDetails(json, org, repo, pagePath) {
   const languages = json?.languages?.data || [];
   const config = json?.config?.data || [];
+  const knownPrefixes = collectLocalePrefixes(json);
 
   const pathLang = languages.find((lang) => pagePath.startsWith(`${lang.location}/`)
     || pagePath === lang.location);
@@ -55,6 +171,7 @@ function getPrefixDetails(json, org, repo, pagePath) {
     return {
       currPrefix: pathLang.location,
       prefixes: formatPrefixes(org, repo, pathLang.location, pathLang.locales, pagePath),
+      knownPrefixes,
       isLocale: false,
     };
   }
@@ -63,18 +180,19 @@ function getPrefixDetails(json, org, repo, pagePath) {
   const pathLocale = allLocales.find((locale) => pagePath.startsWith(`${locale}/`)
     || pagePath === locale);
   if (pathLocale) {
-    return { currPrefix: pathLocale, prefixes: [], isLocale: true };
+    return { currPrefix: pathLocale, prefixes: [], knownPrefixes, isLocale: true };
   }
 
   const sourceLang = config.find((row) => row.key === 'source.language');
   const syncLang = languages.find((lang) => lang.name === sourceLang?.value);
   if (!syncLang) {
-    return { currPrefix: null, prefixes: [], isLocale: false };
+    return { currPrefix: null, prefixes: [], knownPrefixes, isLocale: false };
   }
 
   return {
     currPrefix: '/',
     prefixes: formatPrefixes(org, repo, '/', syncLang.location, pagePath),
+    knownPrefixes,
     isLocale: false,
   };
 }
@@ -120,7 +238,7 @@ async function saveVersion(daFetch, destUrl, label) {
   }
 }
 
-async function copyPrefix(daFetch, prefix, behavior, label) {
+async function copyPrefix(daFetch, prefix, behavior, label, sourcePrefix, knownPrefixes) {
   const source = await readSource(daFetch, prefix.source);
   if (!source.ok || !source.text) {
     prefix.status = 'error';
@@ -130,14 +248,15 @@ async function copyPrefix(daFetch, prefix, behavior, label) {
 
   const dest = await readSource(daFetch, prefix.destination);
   const destMissing = !dest.ok || dest.status === 404 || isEmptyHtml(dest.text);
+  const html = rewriteHtmlLinks(source.text, sourcePrefix, prefix.path, knownPrefixes);
 
-  if (behavior === 'merge' && !destMissing && dest.text === source.text) {
+  if (behavior === 'merge' && !destMissing && dest.text === html) {
     prefix.status = 'success';
     prefix.message = 'Already in sync';
     return;
   }
 
-  const resp = await writeSource(daFetch, prefix.destination, source.text);
+  const resp = await writeSource(daFetch, prefix.destination, html);
   if (!resp.ok) {
     prefix.status = 'error';
     prefix.message = `Save failed (${resp.status})`;
@@ -306,7 +425,14 @@ function renderForm({ context, actions, details }) {
       prefix.status = 'pending';
       prefix.message = 'Copying…';
       redrawLists();
-      await copyPrefix(actions.daFetch, prefix, behavior.value, copyLabel);
+      await copyPrefix(
+        actions.daFetch,
+        prefix,
+        behavior.value,
+        copyLabel,
+        details.currPrefix,
+        details.knownPrefixes,
+      );
       redrawLists();
     }, Promise.resolve());
 
