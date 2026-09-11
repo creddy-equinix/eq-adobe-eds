@@ -1,5 +1,7 @@
 /* eslint-disable max-len */
-import decorateNavigationFooter from './navigation-footer.js'
+import decorateNavigationFooter from './navigation-footer.js';
+import { getMetadata } from '../../scripts/aem.js';
+import { getLocalizedPath } from '../../scripts/locales.js';
 const FOOTER_MARKUP = `
 <footer id="footer-primary" lang="" dir="" data-theme="dark" data-component="footer" class="tw:relative tw:overflow-hidden tw:bg-linear-to-b tw:from-neutral-800 tw:to-black tw:text-neutral-400 tw:py-10 tw:nav:bg-linear-120">
   <div class="tw:wrapper tw:relative">
@@ -53,7 +55,7 @@ const FOOTER_MARKUP = `
             </a>
           </div>
         </aside>
-        <div class="tw:flex tw:flex-col tw:border-b tw:border-offset tw:nav:grid tw:nav:grid-cols-3 tw:nav:gap-8 tw:nav:border-0 tw:nav:p-0">
+        <div id="footer-columns" class="tw:flex tw:flex-col tw:border-b tw:border-offset tw:nav:grid tw:nav:grid-cols-3 tw:nav:gap-8 tw:nav:border-0 tw:nav:p-0">
           <div class="tw:flex tw:flex-col tw:nav:gap-3">
             <button data-role="footer-toggle" aria-controls="footer-Company" class="tw:text-start tw:flex tw:flex-row tw:items-center tw:gap-3 tw:justify-between tw:py-3 tw:border-t tw:border-offset tw:nav:py-0 tw:nav:border-0">
               <h6 class="tw:text-xs tw:heading tw:uppercase tw:text-white">Company</h6>
@@ -152,7 +154,7 @@ const FOOTER_MARKUP = `
             </span>
           </button>
         </div>
-        <ul class="tw:flex tw:flex-row tw:flex-wrap tw:gap-x-3 tw:text-xs tw:border-t tw:pt-2 tw:border-offset">
+        <ul id="footer-legal" class="tw:flex tw:flex-row tw:flex-wrap tw:gap-x-3 tw:text-xs tw:border-t tw:pt-2 tw:border-offset">
           <li>
             <a class="tw:inline-block tw:py-2 tw:text-link tw:no-underline tw:hover:text-white tw:nav:py-1" href="/about/legal/terms" aria-label="Legal">Legal</a>
           </li>
@@ -183,6 +185,202 @@ const FOOTER_MARKUP = `
   </div>
 </footer>
 `;
+
+const CARET_SVG = `
+                <svg class="e-caret-down" role="presentation" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M11.1525 16.4493C11.6213 16.9181 12.3825 16.9181 12.8513 16.4493L20.0513 9.24934C20.52 8.78059 20.52 8.01934 20.0513 7.55059C19.5825 7.08184 18.8213 7.08184 18.3525 7.55059L12 13.9031L5.64752 7.55434C5.17877 7.08559 4.41752 7.08559 3.94877 7.55434C3.48002 8.02309 3.48002 8.78434 3.94877 9.25309L11.1488 16.4531L11.1525 16.4493Z" fill="currentColor"></path>
+                </svg>
+`;
+
+const COLUMN_LINK_CLASS = 'tw:py-2 tw:text-link tw:no-underline tw:hover:text-white tw:block tw:nav:py-1';
+const LEGAL_LINK_CLASS = 'tw:inline-block tw:py-2 tw:text-link tw:no-underline tw:hover:text-white tw:nav:py-1';
+
+function toKey(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^0-9a-z]+/gi, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function cellText(cell) {
+  return cell?.textContent.replace(/\s+/g, ' ').trim() || '';
+}
+
+function cellHref(cell) {
+  return cell?.querySelector('a[href]')?.getAttribute('href') || '';
+}
+
+function rowValue(valueCell) {
+  return cellHref(valueCell) || cellText(valueCell);
+}
+
+function isCookieItem(item) {
+  const id = toKey(item.id);
+  const label = toKey(item.label);
+  return id === 'ot-sdk-btn'
+    || id === 'privacy-settings'
+    || label === 'privacy-settings'
+    || label === 'cookie-preference';
+}
+
+function markExternal(anchor, href) {
+  if (href?.startsWith('http')) {
+    anchor.rel = 'external noreferrer noopener';
+    anchor.target = '_blank';
+  }
+}
+
+/**
+ * Reads one footer-nav table (2-column key / value rows).
+ * Label = column heading; Item / Item Link = links under it.
+ */
+function parseFooterNavBlock(block) {
+  const column = { label: '', items: [] };
+  let current = null;
+
+  [...block.children].forEach((row) => {
+    const [nameCell, valueCell] = row.children;
+    if (!valueCell) return;
+    const key = toKey(nameCell.textContent);
+    const text = cellText(valueCell);
+    const href = rowValue(valueCell);
+
+    if (key === 'label' || key === 'column' || key === 'title') {
+      column.label = text;
+    } else if (key === 'item' || key === 'item-label') {
+      current = { label: text, link: '', id: '' };
+      column.items.push(current);
+    } else if (key === 'item-link') {
+      if (current) current.link = href;
+    } else if (key === 'item-id' || key === 'id') {
+      if (current) current.id = text;
+    } else if (key === 'link' && current) {
+      current.link = href;
+    }
+  });
+
+  return column.label ? column : null;
+}
+
+/**
+ * Reads one footer-legal table (2-column key / value rows).
+ */
+function parseFooterLegalBlock(block) {
+  const items = [];
+  let current = null;
+
+  [...block.children].forEach((row) => {
+    const [nameCell, valueCell] = row.children;
+    if (!valueCell) return;
+    const key = toKey(nameCell.textContent);
+    const text = cellText(valueCell);
+    const href = rowValue(valueCell);
+
+    if (key === 'item' || key === 'item-label' || key === 'label') {
+      current = { label: text, link: '', id: '' };
+      items.push(current);
+    } else if (key === 'item-link' || key === 'link') {
+      if (current) current.link = href;
+    } else if (key === 'item-id' || key === 'id') {
+      if (current) current.id = text;
+    }
+  });
+
+  return items;
+}
+
+function parseAuthoredFooter(root) {
+  return {
+    columns: [...root.querySelectorAll('.footer-nav')].map(parseFooterNavBlock).filter(Boolean),
+    legal: [...root.querySelectorAll('.footer-legal')].flatMap(parseFooterLegalBlock),
+  };
+}
+
+async function fetchAuthoredFooter() {
+  const path = getLocalizedPath('footer', getMetadata('footer'));
+  try {
+    const resp = await fetch(`${path}.plain.html`);
+    if (!resp.ok) return { columns: [], legal: [] };
+    const wrap = document.createElement('div');
+    wrap.innerHTML = await resp.text();
+    return parseAuthoredFooter(wrap);
+  } catch {
+    return { columns: [], legal: [] };
+  }
+}
+
+function createFooterLink(item, className) {
+  const href = item.link || '#';
+  const a = document.createElement('a');
+  a.href = href;
+  a.className = className;
+  a.setAttribute('aria-label', item.label);
+  a.textContent = item.label;
+  if (isCookieItem(item)) {
+    a.id = item.id || 'ot-sdk-btn';
+    a.classList.add('ot-sdk-show-settings');
+    if (!item.link) a.href = '#';
+  } else {
+    markExternal(a, href);
+  }
+  return a;
+}
+
+function buildFooterColumn(column) {
+  const slug = toKey(column.label) || 'column';
+  const panelId = `footer-${slug}`;
+  const wrap = document.createElement('div');
+  wrap.className = 'tw:flex tw:flex-col tw:nav:gap-3';
+
+  const btn = document.createElement('button');
+  btn.dataset.role = 'footer-toggle';
+  btn.setAttribute('aria-controls', panelId);
+  btn.className = 'tw:text-start tw:flex tw:flex-row tw:items-center tw:gap-3 tw:justify-between tw:py-3 tw:border-t tw:border-offset tw:nav:py-0 tw:nav:border-0';
+  const heading = document.createElement('h6');
+  heading.className = 'tw:text-xs tw:heading tw:uppercase tw:text-white';
+  heading.textContent = column.label;
+  const caret = document.createElement('span');
+  caret.dataset.role = 'caret';
+  caret.className = 'tw:group-aria-expanded tw:w-3 tw:h-3 tw:transition-transform tw:duration-75 tw:nav:hidden tw:no-js:hidden';
+  caret.innerHTML = CARET_SVG.trim();
+  btn.append(heading, caret);
+
+  const ul = document.createElement('ul');
+  ul.id = panelId;
+  ul.className = 'tw:text-sm';
+  ul.setAttribute('aria-expanded', 'true');
+  ul.dataset.visible = 'true';
+  column.items.forEach((item) => {
+    if (!item.label) return;
+    const li = document.createElement('li');
+    li.className = 'tw:last:pb-3';
+    li.append(createFooterLink(item, COLUMN_LINK_CLASS));
+    ul.append(li);
+  });
+
+  wrap.append(btn, ul);
+  return wrap;
+}
+
+function buildLegalItems(items) {
+  return items.filter((item) => item.label).map((item) => {
+    const li = document.createElement('li');
+    li.append(createFooterLink(item, LEGAL_LINK_CLASS));
+    return li;
+  });
+}
+
+function applyAuthoredFooter(root, authored) {
+  const columnsEl = root.querySelector('#footer-columns');
+  if (columnsEl && authored.columns.length) {
+    columnsEl.replaceChildren(...authored.columns.map(buildFooterColumn));
+  }
+
+  const legalEl = root.querySelector('#footer-legal');
+  if (legalEl && authored.legal.length) {
+    legalEl.replaceChildren(...buildLegalItems(authored.legal));
+  }
+}
 
 function bindFooterToggles(root) {
   const desktop = window.matchMedia('(min-width: 1024px)');
@@ -238,6 +436,8 @@ export default async function decorate(block) {
   });
 
   block.replaceChildren(...staticFooter.children);
+  const authored = await fetchAuthoredFooter();
+  applyAuthoredFooter(block, authored);
   bindFooterToggles(footerEl);
   bindThemeToggle(footerEl);
   decorateNavigationFooter();
