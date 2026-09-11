@@ -3,7 +3,8 @@
  *
  * Content is authored as /{env}/{country}/{lang}/...
  * e.g. /dev/us/en/products → locale root /dev/us/en
- *      /dev/fr/fr          → locale root /dev/fr/fr
+ *      /us/en/case-studies → locale root /us/en
+ *      /master/en/footer   → locale root /master/en
  */
 
 /**
@@ -13,6 +14,9 @@
 export function getLocaleRoot(pathname = window.location.pathname) {
   const threeLevel = pathname.match(/^\/([a-z0-9-]+\/[a-z]{2}\/[a-z]{2})(?=\/|$)/i);
   if (threeLevel) return `/${threeLevel[1]}`;
+
+  const languageMaster = pathname.match(/^\/(master\/[a-z]{2})(?=\/|$)/i);
+  if (languageMaster) return `/${languageMaster[1]}`;
 
   const twoLevel = pathname.match(/^\/([a-z]{2}\/[a-z]{2})(?=\/|$)/i);
   if (twoLevel) return `/${twoLevel[1]}`;
