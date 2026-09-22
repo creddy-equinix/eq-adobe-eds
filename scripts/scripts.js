@@ -13,6 +13,12 @@ import {
   readBlockConfig,
   toCamelCase,
 } from './aem.js';
+import {
+  initSiteMartech,
+  runMartechEager,
+  runMartechLazy,
+  runMartechDelayed,
+} from './martech.js';
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
   const innerTT = window.trustedTypes.createPolicy('tt-inner', {
@@ -252,11 +258,15 @@ export function decorateMain(main) {
 async function loadEager(doc) {
   document.documentElement.lang = 'en';
   decorateTemplateAndTheme();
+  const martechLoadedPromise = initSiteMartech();
   const main = doc.querySelector('main');
   if (main) {
     decorateMain(main);
     document.body.classList.add('appear');
-    await loadSection(main.querySelector('.section'), waitForFirstImage);
+    await Promise.all([
+      martechLoadedPromise.then((ready) => (ready ? runMartechEager() : undefined)),
+      loadSection(main.querySelector('.section'), waitForFirstImage),
+    ]);
   }
 
   try {
@@ -312,6 +322,8 @@ async function loadLazy(doc) {
     loadFooter(footer);
   }
 
+  await runMartechLazy();
+
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
 }
@@ -322,7 +334,9 @@ async function loadLazy(doc) {
  */
 function loadDelayed() {
   import('./consent-check.js');
-  // load anything that can be postponed to the latest here
+  window.setTimeout(() => {
+    runMartechDelayed();
+  }, 3000);
 }
 
 async function loadPage() {
