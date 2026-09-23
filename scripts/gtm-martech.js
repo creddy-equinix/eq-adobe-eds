@@ -19,8 +19,8 @@ import { applyUserConsent } from './martech.js';
  */
 const disabled = new URLSearchParams(window.location.search).get('martech') === 'off';
 
-if (!disabled) {
-  loadOneTrust();
+export function startSiteConsent() {
+  if (!disabled) loadOneTrust();
 }
 
 let consentedLoaded = false;

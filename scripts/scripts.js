@@ -19,7 +19,6 @@ import {
   runMartechLazy,
   runMartechDelayed,
 } from './martech.js';
-import gtmMartech from './gtm-martech.js';
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
   const innerTT = window.trustedTypes.createPolicy('tt-inner', {
@@ -45,6 +44,23 @@ if (window.trustedTypes && window.trustedTypes.createPolicy) {
     createScript: (input) => input,
   });
 }
+
+// GTM tags that call document.write after parse would replace the whole page.
+document.write = () => {};
+document.writeln = () => {};
+
+const gtmMartechReady = import('./gtm-martech.js')
+  .then((mod) => {
+    if (typeof mod.startSiteConsent === 'function') {
+      mod.startSiteConsent();
+    }
+    return mod.default;
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.warn('GTM consent failed to load; page render continues.', error);
+    return null;
+  });
 
 /**
  * load fonts.css and set a session storage flag
@@ -264,8 +280,9 @@ async function loadEager(doc) {
   if (main) {
     decorateMain(main);
     document.body.classList.add('appear');
+    const gtmMartech = await gtmMartechReady;
     await Promise.all([
-      gtmMartech.eager(),
+      gtmMartech ? gtmMartech.eager() : undefined,
       martechLoadedPromise.then((ready) => (ready ? runMartechEager() : undefined)),
       loadSection(main.querySelector('.section'), waitForFirstImage),
     ]);
@@ -324,7 +341,8 @@ async function loadLazy(doc) {
     loadFooter(footer);
   }
 
-  await gtmMartech.lazy();
+  const gtmMartech = await gtmMartechReady;
+  if (gtmMartech) await gtmMartech.lazy();
   await runMartechLazy();
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
@@ -336,8 +354,9 @@ async function loadLazy(doc) {
  * without impacting the user experience.
  */
 function loadDelayed() {
-  window.setTimeout(() => {
-    gtmMartech.delayed();
+  window.setTimeout(async () => {
+    const gtmMartech = await gtmMartechReady;
+    if (gtmMartech) gtmMartech.delayed();
     runMartechDelayed();
   }, 3000);
 }

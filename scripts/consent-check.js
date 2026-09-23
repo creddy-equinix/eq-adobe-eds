@@ -25,33 +25,43 @@ const ONETRUST_DOMAIN_SCRIPT = '04658866-4023-4350-94ca-9033965f7b0b';
  * otSDKStub.js?did=undefined on aem.live because its domain-id lookup
  * only matches *.equinix.com.
  */
-export function loadOneTrust() {
-  if (typeof window.OptanonWrapper !== 'function') {
-    window.OptanonWrapper = function OptanonWrapper() {};
-  }
-  if (document.querySelector(`script[data-domain-script="${ONETRUST_DOMAIN_SCRIPT}"]`)) {
-    return;
-  }
+function toScriptUrl(url) {
+  const policy = window.trustedTypes?.defaultPolicy;
+  return policy?.createScriptURL ? policy.createScriptURL(url) : url;
+}
 
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'SCRIPT') return;
-        const src = node.getAttribute('src') || '';
-        if (src.includes('otSDKStub') && src.includes('did=undefined')) {
-          node.remove();
-        }
+export function loadOneTrust() {
+  try {
+    if (typeof window.OptanonWrapper !== 'function') {
+      window.OptanonWrapper = function OptanonWrapper() {};
+    }
+    if (document.querySelector(`script[data-domain-script="${ONETRUST_DOMAIN_SCRIPT}"]`)) {
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'SCRIPT') return;
+          const src = node.getAttribute('src') || '';
+          if (src.includes('otSDKStub') && src.includes('did=undefined')) {
+            node.remove();
+          }
+        });
       });
     });
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  const script = document.createElement('script');
-  script.src = `https://cdn.cookielaw.org/consent/${ONETRUST_DOMAIN_SCRIPT}/otSDKStub.js`;
-  script.setAttribute('data-domain-script', ONETRUST_DOMAIN_SCRIPT);
-  script.setAttribute('data-document-language', 'true');
-  script.async = true;
-  document.head.append(script);
+    const script = document.createElement('script');
+    script.src = toScriptUrl(`https://cdn.cookielaw.org/consent/${ONETRUST_DOMAIN_SCRIPT}/otSDKStub.js`);
+    script.setAttribute('data-domain-script', ONETRUST_DOMAIN_SCRIPT);
+    script.setAttribute('data-document-language', 'true');
+    script.async = true;
+    document.head.append(script);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('OneTrust failed to load; page render continues.', error);
+  }
 }
 
 function parseQueryConsent() {
