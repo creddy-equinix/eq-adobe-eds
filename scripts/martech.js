@@ -1,4 +1,5 @@
 import { getMetadata } from './aem.js';
+import { getCurrentGroups, toAdobeConsent } from './consent-check.js';
 // eslint-disable-next-line import/no-relative-packages
 import {
   initMartech,
@@ -49,7 +50,19 @@ export function isTargetRequested() {
 }
 
 /**
- * Initializes Web SDK / Target. Independent of consent-check.js / GTM.
+ * Applies Adobe Web SDK / Target consent when alloy is initialized.
+ * No-ops until initSiteMartech succeeds (GTM consent can arrive first).
+ * @param {Object} consent
+ * @returns {Promise<void>}
+ */
+export async function applyUserConsent(consent) {
+  if (!initialized) return;
+  await updateUserConsent(consent);
+}
+
+/**
+ * Initializes Web SDK / Target. Consent is granted only after OneTrust / GTM
+ * (or ?consent=accept) maps groups via applyUserConsent.
  * @returns {Promise<boolean>} true when the plugin was initialized
  */
 export async function initSiteMartech() {
@@ -78,13 +91,9 @@ export async function initSiteMartech() {
   );
 
   initialized = true;
-  if (personalization) {
-    await updateUserConsent({
-      collect: true,
-      marketing: true,
-      personalize: true,
-      share: true,
-    });
+  const groups = getCurrentGroups();
+  if (groups.length) {
+    await updateUserConsent(toAdobeConsent(groups));
   }
   return true;
 }

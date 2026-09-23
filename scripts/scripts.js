@@ -19,6 +19,7 @@ import {
   runMartechLazy,
   runMartechDelayed,
 } from './martech.js';
+import gtmMartech from './gtm-martech.js';
 
 if (window.trustedTypes && window.trustedTypes.createPolicy) {
   const innerTT = window.trustedTypes.createPolicy('tt-inner', {
@@ -264,6 +265,7 @@ async function loadEager(doc) {
     decorateMain(main);
     document.body.classList.add('appear');
     await Promise.all([
+      gtmMartech.eager(),
       martechLoadedPromise.then((ready) => (ready ? runMartechEager() : undefined)),
       loadSection(main.querySelector('.section'), waitForFirstImage),
     ]);
@@ -322,6 +324,7 @@ async function loadLazy(doc) {
     loadFooter(footer);
   }
 
+  await gtmMartech.lazy();
   await runMartechLazy();
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
@@ -333,8 +336,8 @@ async function loadLazy(doc) {
  * without impacting the user experience.
  */
 function loadDelayed() {
-  import('./consent-check.js');
   window.setTimeout(() => {
+    gtmMartech.delayed();
     runMartechDelayed();
   }, 3000);
 }
