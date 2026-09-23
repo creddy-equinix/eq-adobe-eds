@@ -17,6 +17,42 @@
 
 const ALL_GROUPS = ['C0001', 'C0002', 'C0003', 'C0004'];
 const CONSENT_WAIT_MS = 10000;
+/** Same default COM script as AEM onetrust.html / GTM-KPFQZC3. */
+const ONETRUST_DOMAIN_SCRIPT = '04658866-4023-4350-94ca-9033965f7b0b';
+
+/**
+ * Load OneTrust from the site (not GTM). GTM-KPFQZC3 injects
+ * otSDKStub.js?did=undefined on aem.live because its domain-id lookup
+ * only matches *.equinix.com.
+ */
+export function loadOneTrust() {
+  if (typeof window.OptanonWrapper !== 'function') {
+    window.OptanonWrapper = function OptanonWrapper() {};
+  }
+  if (document.querySelector(`script[data-domain-script="${ONETRUST_DOMAIN_SCRIPT}"]`)) {
+    return;
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'SCRIPT') return;
+        const src = node.getAttribute('src') || '';
+        if (src.includes('otSDKStub') && src.includes('did=undefined')) {
+          node.remove();
+        }
+      });
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  const script = document.createElement('script');
+  script.src = `https://cdn.cookielaw.org/consent/${ONETRUST_DOMAIN_SCRIPT}/otSDKStub.js`;
+  script.setAttribute('data-domain-script', ONETRUST_DOMAIN_SCRIPT);
+  script.setAttribute('data-document-language', 'true');
+  script.async = true;
+  document.head.append(script);
+}
 
 function parseQueryConsent() {
   const consent = new URLSearchParams(window.location.search).get('consent');

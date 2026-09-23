@@ -2,6 +2,7 @@
 import GtmMartech from '../plugins/gtm-martech/src/index.js';
 import {
   getCurrentGroups,
+  loadOneTrust,
   toAdobeConsent,
   toGoogleConsent,
   waitForConsent,
@@ -17,6 +18,10 @@ import { applyUserConsent } from './martech.js';
  * Disable with ?martech=off (also used by DA preview).
  */
 const disabled = new URLSearchParams(window.location.search).get('martech') === 'off';
+
+if (!disabled) {
+  loadOneTrust();
+}
 
 let consentedLoaded = false;
 
