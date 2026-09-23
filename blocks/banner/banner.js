@@ -192,7 +192,7 @@ function createCopy({
 
   const heading = document.createElement('h1');
   heading.dataset.role = 'title';
-  heading.id = `${uid}-banner-heading`;
+  heading.id = 'banner-heading';
   heading.className = 'tw:heading tw:text-3xl tw:max-w-4xl tw:m-0';
   heading.textContent = title;
   copy.append(heading);
@@ -248,7 +248,7 @@ export default function decorate(block) {
   block.dir = '';
   block.dataset.theme = 'dark';
   block.dataset.component = 'banner/standard';
-  block.setAttribute('aria-labelledby', `${uid}-banner-heading`);
+  block.setAttribute('aria-labelledby', 'banner-heading');
   block.classList.add(...SECTION_CLASSES);
 
   const overlay = document.createElement('div');
