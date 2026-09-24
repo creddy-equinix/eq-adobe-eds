@@ -43,8 +43,13 @@ export function loadOneTrust() {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== Node.ELEMENT_NODE || node.tagName !== 'SCRIPT') return;
-          const src = node.getAttribute('src') || '';
-          if (src.includes('otSDKStub') && src.includes('did=undefined')) {
+          const src = node.getAttribute('src') || node.src || '';
+          const extraStub = src.includes('otSDKStub')
+            && (src.includes('did=undefined')
+              || document.querySelectorAll('script[src*="otSDKStub"]').length > 1);
+          const extraBannerSdk = src.includes('otBannerSdk.js')
+            && document.querySelectorAll('script[src*="otBannerSdk"]').length > 1;
+          if (extraStub || extraBannerSdk) {
             node.remove();
           }
         });
