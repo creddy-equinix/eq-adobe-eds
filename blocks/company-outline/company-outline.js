@@ -8,9 +8,7 @@ const COMPANY_OUTLINE_MARKUP = `
                             <div class="tw:w-full tw:text-secondary tw:overflow-y-auto tw:scrollbar">
                                 <div class="tw:relative tw:space-y-6 tw:text-sm tw:text-pretty tw:lg:text-xs">
                                     <img class="tw:h-auto tw:w-full tw:max-w-40 tw:dark:grayscale-100 tw:dark:saturate-0 tw:dark:brightness-0 tw:dark:invert-100" data-graphic="logo-nanyang-biologics" src="https://qa.equinix.com/content/dam/eqxcorp/en_us/images/customer-stories/Nanyang.svg" alt="Nanyang Logo Alt text">
-                                    <div data-role="aside-description" class="tw:prose-minor tw:space-y-3" aria-label="Company description">
-                                        <p>Nanyang Biologics has been shaping Hong Kong's skyline and infrastructure since 1958, delivering critical infrastructure while continually tackling complex safety challenges. Building on its long-standing Zero Harm commitment, Gammon is now re-imagining its future through digital transformation and AI-driven Smart Construction 4.0.</p>
-                                    </div>
+                                    <div data-role="aside-description" class="tw:prose-minor tw:space-y-3" aria-label="Company description"></div>
                                     <div data-role="aside-metadata" aria-label="Company attributes" class="tw:grid tw:grid-cols-1 tw:gap-6 tw:sm:grid-cols-3 tw:lg:grid-cols-1 tw:xl:grid-cols-2 tw:print:hidden">
                                         <dl>
                                             <dt><strong class="tw:text-strong">Company size</strong></dt>
@@ -34,7 +32,7 @@ const COMPANY_OUTLINE_MARKUP = `
                                     </div>
                                     <div data-role="aside-cta" class="tw:flex tw:flex-row tw:flex-wrap tw:gap-2 tw:items-center tw:max-w-max tw:xl:pt-4">
     <a class="tw:button tw:cursor-pointer tw:button--primary tw:button--sm   " data-component="button" href="/contact-us/sales">
-    	<span class="tw:button__label">Talk to an expert</span>
+        <span class="tw:button__label">Talk to an expert</span>
     </a>
                                         <a id="btn-print" href="#" data-component="button" class="tw:button tw:cursor-pointer tw:button--secondary tw:button--icon-start tw:button--sm">
                                             <span class="tw:button__label">Print page</span>
@@ -65,6 +63,12 @@ const META_LINK_BASES = {
 const META_FIELDS = Object.keys(META_LINK_BASES);
 
 /**
+ * Company blurb from page metadata (not the SEO <meta name="description">).
+ * Author in Document Authoring as: Company Description | ...
+ */
+const DESCRIPTION_META = 'company-description';
+
+/**
  * Splits a comma-separated metadata value into trimmed labels.
  * @param {string} value
  * @returns {string[]}
@@ -86,6 +90,26 @@ function toSlug(label) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Fills the aside description from page metadata `company-description`.
+ * Hides the block when that metadata is missing.
+ * @param {Element} root
+ */
+function populateDescription(root) {
+  const container = root.querySelector('[data-role="aside-description"]');
+  if (!container) return;
+
+  const text = getMetadata(DESCRIPTION_META).trim();
+  if (!text) {
+    container.hidden = true;
+    return;
+  }
+
+  const paragraph = document.createElement('p');
+  paragraph.textContent = text;
+  container.replaceChildren(paragraph);
 }
 
 /**
@@ -131,12 +155,14 @@ export default async function decorate(block) {
 
   staticContainer.innerHTML = COMPANY_OUTLINE_MARKUP;
 
-  // Labels come from page metadata, e.g.:
+  // Text and labels come from page metadata, e.g.:
+  // <meta name="company-description" content="Nanyang Biologics has been shaping...">
   // <meta name="region" content="Asia Pacific, Americas">
   // <meta name="solution" content="Colocation, AI">
   // <meta name="product" content="Equinix Fabric, Fabric Cloud Router">
   // <meta name="industry" content="Automotive, Public Sector">
   // <meta name="team" content="AI Leaders, Cloud Architects">
+  populateDescription(staticContainer);
   META_FIELDS.forEach((metaName) => populateMetaList(staticContainer, metaName));
 
   block.replaceChildren(staticContainer);
